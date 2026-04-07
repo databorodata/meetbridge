@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "editor": { "vimMode": false },
+  "permissions": {
+    "allow": ["Read(**)", "Shell(gh)"],
+    "deny": ["Write(**)"]
+  }
+}

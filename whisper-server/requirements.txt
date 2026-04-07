@@ -1,0 +1,5 @@
+# WhisperLive + сервер (см. help/whisper.md). Мост создаёт .venv и ставит это при первом serve.
+numpy<2
+fastapi
+uvicorn
+whisper-live
