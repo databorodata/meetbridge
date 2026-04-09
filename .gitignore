@@ -25,5 +25,9 @@ build/
 .cache/
 
 Audio-Transcription/
-chrome-extension-web-transcriptor-ai/
+achrome-extension-web-transcriptor-ai/
 help/
+audio_recorder/
+extension-meet-bridge/
+
+.gitignore

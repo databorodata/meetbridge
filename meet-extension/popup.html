@@ -9,88 +9,23 @@
   <body>
     <header class="header">
       <div class="title">Meet Assist</div>
-      <div id="status" class="status status--idle">нет соединения</div>
+      <div id="status" class="status status--idle">готово</div>
     </header>
 
-    <section class="card">
-      <div class="card__title">Мост (meet-bridge)</div>
-
-      <label class="field">
-        <div class="field__label">Bridge URL</div>
-        <input id="bridgeUrl" class="field__input" type="text" placeholder="http://127.0.0.1:7337" />
-      </label>
-
-      <label class="field">
-        <div class="field__label">X-Bridge-Token (опционально)</div>
-        <input id="bridgeToken" class="field__input" type="password" placeholder="секрет" />
-      </label>
-
-      <label class="field">
-        <div class="field__label">Repo path (для /session/start)</div>
-        <input
-          id="repoPath"
-          class="field__input"
-          type="text"
-          placeholder="/path/to/git/repo"
-        />
-      </label>
-
-      <div class="row">
-        <button id="saveSettings" class="btn btn--secondary" type="button">Сохранить</button>
-        <button id="health" class="btn" type="button">Проверить</button>
+    <section class="card card--primary">
+      <div class="row row--baseline">
+        <label class="field field--inline">
+          <div class="field__label">Модель агента</div>
+          <select id="model" class="select">
+            <option value="auto" selected>auto</option>
+            <option value="composer-2-fast">composer-2-fast</option>
+            <option value="composer-2">composer-2</option>
+          </select>
+        </label>
       </div>
-    </section>
-
-    <section class="card">
-      <div class="card__title">WhisperLive (аудио вкладки)</div>
 
       <label class="field">
-        <div class="field__label">WebSocket URL</div>
-        <input id="whisperWsUrl" class="field__input" type="text" placeholder="ws://127.0.0.1:9090" />
-      </label>
-
-      <label class="field">
-        <div class="field__label">Модель</div>
-        <select id="whisperModel" class="select">
-          <option value="tiny">tiny</option>
-          <option value="base">base</option>
-          <option value="small" selected>small</option>
-          <option value="medium">medium</option>
-        </select>
-      </label>
-
-      <label class="field">
-        <div class="field__label">Язык аудио (пусто = авто)</div>
-        <input id="whisperLanguage" class="field__input" type="text" placeholder="ru или оставьте пустым" />
-      </label>
-
-      <label class="field">
-        <div class="field__label">Задача Whisper</div>
-        <select id="whisperTask" class="select">
-          <option value="transcribe" selected>transcribe</option>
-          <option value="translate">translate (→ English)</option>
-        </select>
-      </label>
-
-      <label class="check">
-        <input id="whisperUseVad" type="checkbox" checked />
-        <span>use_vad (тише тишина — меньше нагрузка)</span>
-      </label>
-
-      <div class="row">
-        <button id="startCapture" class="btn" type="button">Начать захват</button>
-        <button id="stopCapture" class="btn btn--secondary" type="button">Стоп</button>
-      </div>
-      <div id="captureHint" class="small muted">
-        Перед стартом откройте вкладку с встречей; после нажатия она станет активной. Сервисная вкладка «захват» останется закреплённой.
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="card__title">Контекст для агента</div>
-
-      <label class="field">
-        <div class="field__label">Окно в промпт, минут (последние N минут транскрипта)</div>
+        <div class="field__label">Контекст встречи: последние N минут</div>
         <input
           id="contextWindowMinutes"
           class="field__input"
@@ -102,49 +37,91 @@
         />
       </label>
 
-      <label class="check">
-        <input id="meetingContextAuto" type="checkbox" checked />
-        <span>Обновлять поле «Meeting context» из транскрипта автоматически</span>
-      </label>
-
       <label class="field">
-        <div class="field__label">Meeting context (в /agent/ask)</div>
-        <textarea id="meetingContext" class="field__textarea" rows="5" placeholder="последние N минут — подставляются при транскрипте"></textarea>
+        <div class="field__label">Meeting context (подставляется из транскрипта)</div>
+        <textarea
+          id="meetingContext"
+          class="field__textarea field__textarea--readonly"
+          rows="4"
+          readonly
+          placeholder="появится после захвата аудио встречи"
+        ></textarea>
       </label>
-    </section>
 
-    <section class="card">
-      <div class="card__title">Сессия моста</div>
-      <div class="row row--top">
-        <button id="startSession" class="btn" type="button">Start session</button>
-        <div class="mono">
-          <div class="muted">session_id</div>
-          <div id="sessionId" class="mono__value">—</div>
-        </div>
+      <button id="btnStartWork" class="btn btn--primary" type="button">Начать работу</button>
+      <div id="workHint" class="small muted">
+        Откройте расширение на <strong>вкладке с встречей</strong>, укажите repo в «Настройках», затем нажмите «Начать работу»: проверка моста → сессия → захват аудио вкладки.
       </div>
-      <div id="sessionInfo" class="small muted"></div>
+      <div id="sessionLine" class="small muted session-line">
+        <span class="muted">session:</span> <span id="sessionId" class="mono-inline">—</span>
+      </div>
     </section>
 
     <section class="card">
-      <div class="card__title">Запрос агенту</div>
-
-      <label class="field">
-        <div class="field__label">Question</div>
-        <textarea id="question" class="field__textarea" rows="3" placeholder="что спросить у агента?"></textarea>
-      </label>
-
+      <div class="card__title">Вопрос агенту</div>
+      <p class="small muted">
+        Надиктуйте в микрофон или введите текст. После «Стоп» можно править вручную, затем «Отправить агенту».
+      </p>
       <div class="row">
-        <button id="ask" class="btn" type="button">Отправить</button>
-        <select id="model" class="select">
-          <option value="auto" selected>auto</option>
-          <option value="composer-2-fast">composer-2-fast</option>
-          <option value="composer-2">composer-2</option>
-        </select>
+        <button id="startDictation" class="btn" type="button">Задать вопрос (микрофон)</button>
+        <button id="stopDictation" class="btn btn--secondary" type="button">Стоп</button>
       </div>
+      <label class="field">
+        <div class="field__label">Текст вопроса</div>
+        <textarea id="question" class="field__textarea" rows="4" placeholder="вопрос для агента…"></textarea>
+      </label>
+      <button id="ask" class="btn btn--primary" type="button">Отправить агенту</button>
+    </section>
 
-      <div class="card__title card__title--mt">Ответ</div>
+    <section class="card">
+      <div class="card__title">Ответ</div>
       <pre id="answer" class="answer">(пусто)</pre>
     </section>
+
+    <details class="details" id="detailsSettings">
+      <summary class="details__summary">Настройки</summary>
+      <div class="details__body">
+        <label class="field">
+          <div class="field__label">Repo path (git-репозиторий для агента)</div>
+          <input
+            id="repoPath"
+            class="field__input"
+            type="text"
+            placeholder="/path/to/git/repo"
+          />
+        </label>
+
+        <label class="field">
+          <div class="field__label">Whisper: модель</div>
+          <select id="whisperModel" class="select">
+            <option value="tiny">tiny</option>
+            <option value="base">base</option>
+            <option value="small" selected>small</option>
+            <option value="medium">medium</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <div class="field__label">Язык аудио (пусто = авто)</div>
+          <input id="whisperLanguage" class="field__input" type="text" placeholder="оставьте пустым" />
+        </label>
+
+        <label class="check">
+          <input id="whisperUseVad" type="checkbox" checked />
+          <span>use_vad (тише фон — меньше нагрузка)</span>
+        </label>
+
+        <label class="check">
+          <input id="pauseMeetingWhileDictating" type="checkbox" checked />
+          <span>Пауза захвата встречи во время диктовки</span>
+        </label>
+
+        <div class="row">
+          <button id="saveSettings" class="btn btn--secondary" type="button">Сохранить настройки</button>
+          <button id="stopCapture" class="btn btn--secondary" type="button">Стоп захвата</button>
+        </div>
+      </div>
+    </details>
 
     <script src="popup.js"></script>
   </body>
