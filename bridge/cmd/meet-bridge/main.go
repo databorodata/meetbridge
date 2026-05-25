@@ -210,7 +210,15 @@ func runServe(args []string) int {
 	}
 
 	if os.Getenv("CURSOR_API_KEY") == "" {
-		log.Printf("WARNING: CURSOR_API_KEY is not set in this process. /agent/ask will fail unless you run 'agent login' or export CURSOR_API_KEY before starting the server.")
+		log.Printf("WARNING: CURSOR_API_KEY is not set — /agent/ask will fail. Set it in .env or export before starting.")
+	}
+
+	if os.Getenv("GITHUB_TOKEN") == "" && os.Getenv("GH_TOKEN") == "" {
+		log.Printf("INFO: GITHUB_TOKEN not set — agent won't be able to query GitHub issues/PR via 'gh'. " +
+			"To enable: create a fine-grained PAT (Contents/Issues/Pull requests: Read-only) and set GITHUB_TOKEN in .env.")
+	} else {
+		log.Printf("INFO: GITHUB_TOKEN is set. Make sure it is a fine-grained PAT with READ-ONLY permissions " +
+			"(Contents/Issues/Pull requests: Read). A write token allows the agent to mutate GitHub. See README §Security.")
 	}
 
 	if !*skipWhisperSetup && strings.TrimSpace(os.Getenv("MEET_BRIDGE_SKIP_WHISPER_SETUP")) != "1" {
