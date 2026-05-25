@@ -279,8 +279,8 @@ func runServe(args []string) int {
 	}
 
 	// POST /session/start
-	// Read-only: validates repo path and records it in memory under a session_id.
-	// Does not run git fetch/pull and does not modify the repository.
+	// Validates repo path, runs git fetch --all --prune (non-blocking on failure),
+	// and records the session in memory.
 	mux.HandleFunc("/session/start", func(w http.ResponseWriter, r *http.Request) {
 		if bridgeToken != "" && r.Header.Get("X-Bridge-Token") != bridgeToken {
 			writeJSON(w, http.StatusUnauthorized, startResp{
@@ -348,7 +348,27 @@ func runServe(args []string) int {
 			})
 			return
 		}
-		// Read-only HEAD for observability.
+		// git fetch --all --prune (60s timeout, non-blocking: session created even on failure).
+		fetchOk := false
+		fetchDetails := ""
+		{
+			fetchCtx, fetchCancel := context.WithTimeout(r.Context(), 60*time.Second)
+			defer fetchCancel()
+			fetchCmd := exec.CommandContext(fetchCtx, "git", "fetch", "--all", "--prune")
+			fetchCmd.Dir = abs
+			out, ferr := fetchCmd.CombinedOutput()
+			if ferr != nil {
+				fetchDetails = strings.TrimSpace(string(out))
+				if fetchDetails == "" {
+					fetchDetails = ferr.Error()
+				}
+				log.Printf("git fetch failed in %s: %v", abs, ferr)
+			} else {
+				fetchOk = true
+			}
+		}
+
+		// HEAD after fetch.
 		headCmd := exec.Command("git", "rev-parse", "HEAD")
 		headCmd.Dir = abs
 		headOut, headErr := headCmd.CombinedOutput()
@@ -356,6 +376,12 @@ func runServe(args []string) int {
 		if headErr != nil {
 			head = ""
 		}
+
+		// Current branch name.
+		branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+		branchCmd.Dir = abs
+		branchOut, _ := branchCmd.CombinedOutput()
+		currentBranch := strings.TrimSpace(string(branchOut))
 
 		// session_id: time-based unique enough for MVP; can be replaced with UUID later.
 		model := strings.TrimSpace(*defaultModel)
@@ -395,10 +421,10 @@ func runServe(args []string) int {
 			Ok:        true,
 			SessionID: sessionID,
 			Git: map[string]any{
-				"fetch_ok": false,
-				"head":     head,
-				"branch":   strings.TrimSpace(req.Branch),
-				"note":     "read-only mode: no git fetch performed",
+				"fetch_ok":       fetchOk,
+				"fetch_details":  fetchDetails,
+				"head":           head,
+				"branch":         currentBranch,
 			},
 			Options: map[string]any{
 				"model":           model,
