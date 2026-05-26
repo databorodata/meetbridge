@@ -259,6 +259,7 @@ async function executeStartCapture(opts = {}) {
         useVad: s.whisperUseVad !== false,
       },
     });
+    await chrome.storage.local.set({ capturedMeetTabId: meetTabId });
     return { ok: true };
   } catch (e) {
     await chrome.storage.local.set({ capturing: false });
@@ -351,6 +352,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           }
           await chrome.storage.local.set({ capturing: false });
           chrome.action.setBadgeText({ text: "" }).catch(() => {});
+
+          const { capturedMeetTabId } = await chrome.storage.local.get("capturedMeetTabId");
+          if (capturedMeetTabId != null) {
+            try {
+              await chrome.tabs.update(capturedMeetTabId, { muted: true });
+            } catch {
+              /* ignore — tab may have been closed */
+            }
+          }
         }
 
         const wsUrl = (s.whisperWsUrl || "ws://127.0.0.1:9090").trim();
@@ -393,6 +403,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           }
         }
         await chrome.storage.local.set({ dictating: false });
+
+        const { capturedMeetTabId } = await chrome.storage.local.get("capturedMeetTabId");
+        if (capturedMeetTabId != null) {
+          try {
+            await chrome.tabs.update(capturedMeetTabId, { muted: false });
+          } catch {
+            /* ignore — tab may have been closed */
+          }
+        }
 
         const s = await chrome.storage.local.get(["dictationPausedMeetingCapture"]);
         if (s.dictationPausedMeetingCapture) {

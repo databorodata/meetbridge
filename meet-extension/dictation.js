@@ -282,7 +282,6 @@ async function startDictation(option) {
   };
 
   src.connect(workletNode);
-  src.connect(context.destination);
 
   window.addEventListener("beforeunload", () => cleanupAndClose(), { once: true });
 }
