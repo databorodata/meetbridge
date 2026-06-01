@@ -8,12 +8,14 @@ const DEFAULTS = {
   repoPath: "",
   whisperModel: "small",
   whisperLanguage: "",
-  whisperUseVad: true,
-  pauseMeetingWhileDictating: true,
   contextWindowMinutes: 3,
   sessionId: "",
   model: "auto",
+  modelCustom: "",
 };
+
+let isCapturing = false;
+let isDictating = false;
 
 function $(id) {
   const el = document.getElementById(id);
@@ -66,26 +68,65 @@ async function getBridgeState() {
   return state;
 }
 
+function getSelectedModel() {
+  const val = $("model").value;
+  if (val === "custom") {
+    return $("modelCustom").value.trim() || "auto";
+  }
+  return val;
+}
+
+function updateSendButtonState() {
+  $("btnSendToAgent").disabled = !$("question").value.trim();
+}
+
 async function loadState() {
   const state = await chrome.storage.local.get(DEFAULTS);
   $("repoPath").value = state.repoPath;
   $("whisperModel").value = state.whisperModel || DEFAULTS.whisperModel;
   $("whisperLanguage").value = state.whisperLanguage ?? "";
-  $("whisperUseVad").checked = state.whisperUseVad !== false;
-  $("pauseMeetingWhileDictating").checked = state.pauseMeetingWhileDictating !== false;
   $("contextWindowMinutes").value = String(
     state.contextWindowMinutes ?? DEFAULTS.contextWindowMinutes
   );
-  $("sessionId").textContent = state.sessionId || "—";
   $("model").value = state.model || "auto";
+  $("modelCustom").value = state.modelCustom || "";
+  
+  // Показать/скрыть custom model input
+  const isCustom = $("model").value === "custom";
+  $("modelCustom").classList.toggle("field__input--hidden", !isCustom);
 
-  const { dictationDraftText = "", questionDraftText = "" } = await chrome.storage.local.get([
+  const { dictationDraftText = "", questionDraftText = "", lastAnswer = "(пусто)" } = await chrome.storage.local.get([
     "dictationDraftText",
     "questionDraftText",
+    "lastAnswer",
   ]);
   $("question").value = questionDraftText || dictationDraftText || "";
+  $("answer").textContent = lastAnswer;
 
   await refreshMeetingContextFromTranscript();
+
+  // Восстановить состояние кнопок
+  const { capturing = false, dictating = false } = await chrome.storage.local.get(["capturing", "dictating"]);
+  isCapturing = capturing;
+  isDictating = dictating;
+  if (isCapturing) {
+    $("btnCapture").textContent = "Перестать слушать";
+    $("btnCapture").classList.remove("btn--primary");
+    $("btnCapture").classList.add("btn--danger");
+  }
+  if (isDictating) {
+    $("btnDictation").textContent = "Остановить запись вопроса";
+    $("btnDictation").classList.remove("btn--primary");
+    $("btnDictation").classList.add("btn--danger");
+  }
+
+  // Dismissable reminder
+  const { reminderDismissed = false } = await chrome.storage.local.get("reminderDismissed");
+  if (reminderDismissed) {
+    $("reminder").style.display = "none";
+  }
+
+  updateSendButtonState();
   return state;
 }
 
@@ -137,17 +178,11 @@ async function persistAllFromInputs() {
     repoPath: $("repoPath").value.trim(),
     whisperModel: $("whisperModel").value,
     whisperLanguage: $("whisperLanguage").value.trim(),
-    whisperUseVad: $("whisperUseVad").checked,
-    pauseMeetingWhileDictating: $("pauseMeetingWhileDictating").checked,
     contextWindowMinutes:
       Number.isFinite(ctxMin) && ctxMin > 0 ? ctxMin : DEFAULTS.contextWindowMinutes,
     model: $("model").value,
+    modelCustom: $("modelCustom").value.trim(),
   });
-}
-
-async function onSave() {
-  await persistAllFromInputs();
-  setStatus("ok", "сохранено");
 }
 
 function setupAutosaveSettings() {
@@ -155,8 +190,6 @@ function setupAutosaveSettings() {
     "repoPath",
     "whisperModel",
     "whisperLanguage",
-    "whisperUseVad",
-    "pauseMeetingWhileDictating",
   ];
   for (const id of ids) {
     const el = $(id);
@@ -166,74 +199,115 @@ function setupAutosaveSettings() {
   }
 }
 
-async function onStartWork() {
-  setStatus("idle", "запуск…");
-  $("answer").textContent = "";
-
-  const repoPath = $("repoPath").value.trim();
-  if (!repoPath) {
-    workLog("error", "repo_path пуст — укажите в «Настройках»");
-    setStatus("bad", "укажите repo в настройках");
-    $("answer").textContent = "Откройте «Настройки» и укажите путь к git-репозиторию.";
-    return;
-  }
-
-  await persistWhisperSettingsForCapture();
-
-  try {
-    workLog("health", `GET ${getBridgeBaseUrl()}/health`);
-    const h = await httpGET("/health");
-    if (h.status !== 200 || !h.json?.ok) {
-      workLog("health_fail", `status=${h.status} ok=${h.json?.ok}`);
-      setStatus("bad", "мост недоступен");
-      $("answer").textContent = pretty(h.json) || h.rawBody?.slice(0, 500) || "ошибка";
+async function onToggleCapture() {
+  if (isCapturing) {
+    // Остановить захват (НЕ очищать транскрипт!)
+    const res = await chrome.runtime.sendMessage({ type: "STOP_CAPTURE" });
+    if (res?.ok) {
+      isCapturing = false;
+      $("btnCapture").textContent = "Слушать встречу";
+      $("btnCapture").classList.remove("btn--danger");
+      $("btnCapture").classList.add("btn--primary");
+      setStatus("ok", "пауза");
+    }
+  } else {
+    // Сначала health + session (как в старом onStartWork), потом capture
+    setStatus("idle", "подключение…");
+    const repoPath = $("repoPath").value.trim();
+    if (!repoPath) {
+      setStatus("bad", "укажите repo в настройках");
       return;
     }
-    workLog("health_ok", `v=${h.json?.version ?? "?"}`);
+    await persistWhisperSettingsForCapture();
 
-    const model = $("model").value || "auto";
-    const whisperModel = $("whisperModel").value || "small";
-    workLog("session_start", `POST /session/start repo=${repoPath.slice(0, 48)}…`);
-    const { json, status } = await httpJSON("/session/start", {
-      repo_path: repoPath,
-      branch: "main",
-      options: {
-        model,
-        timeout_seconds: 600,
-        whisper_model: whisperModel,
-        whisper_ws_url: WHISPER_WS_URL,
-      },
-    });
-    if (status !== 200 || !json?.ok) {
-      workLog("session_fail", `status=${status}`);
-      setStatus("bad", "сессия не создана");
-      $("answer").textContent = pretty(json);
-      return;
-    }
-    await saveState({ sessionId: json.session_id });
-    $("sessionId").textContent = json.session_id;
-    workLog("session_ok", `session_id=${json.session_id}`);
+    try {
+      workLog("health", `GET ${getBridgeBaseUrl()}/health`);
+      const h = await httpGET("/health");
+      if (h.status !== 200 || !h.json?.ok) {
+        workLog("health_fail", `status=${h.status} ok=${h.json?.ok}`);
+        setStatus("bad", "мост недоступен");
+        $("answer").textContent = "meet-bridge не запущен. Запустите ./start.sh";
+        return;
+      }
+      workLog("health_ok", `v=${h.json?.version ?? "?"}`);
 
-    workLog("capture", "START_CAPTURE");
-    const cap = await chrome.runtime.sendMessage({ type: "START_CAPTURE" });
-    if (!cap?.ok) {
-      workLog("capture_fail", cap?.error || "unknown");
-      setStatus("bad", "захват не запущен");
-      $("answer").textContent = cap?.error || "не удалось";
-      return;
+      const model = getSelectedModel();
+      const whisperModel = $("whisperModel").value || "small";
+      workLog("session_start", `POST /session/start repo=${repoPath.slice(0, 48)}…`);
+      const { json, status } = await httpJSON("/session/start", {
+        repo_path: repoPath,
+        branch: "main",
+        options: {
+          model,
+          timeout_seconds: 600,
+          whisper_model: whisperModel,
+          whisper_ws_url: WHISPER_WS_URL,
+        },
+      });
+      if (status !== 200 || !json?.ok) {
+        workLog("session_fail", `status=${status}`);
+        setStatus("bad", "сессия не создана");
+        $("answer").textContent = pretty(json);
+        return;
+      }
+      await saveState({ sessionId: json.session_id });
+      workLog("session_ok", `session_id=${json.session_id}`);
+
+      workLog("capture", "START_CAPTURE");
+      // preserveTranscript: true если повторный запуск после паузы (isCapturing был true до этого)
+      const cap = await chrome.runtime.sendMessage({ type: "START_CAPTURE", preserveTranscript: false });
+      if (!cap?.ok) {
+        workLog("capture_fail", cap?.error || "unknown");
+        setStatus("bad", cap?.error || "захват не запущен");
+        return;
+      }
+      workLog("capture_ok", "ok");
+      isCapturing = true;
+      $("btnCapture").textContent = "Перестать слушать";
+      $("btnCapture").classList.remove("btn--primary");
+      $("btnCapture").classList.add("btn--danger");
+      setStatus("ok", "слушаю встречу");
+    } catch (e) {
+      workLog("error", String(e?.message || e));
+      setStatus("bad", "ошибка");
+      $("answer").textContent = String(e?.message || e);
     }
-    workLog("capture_ok", "ok");
-    setStatus("ok", "работаем • захват включён");
-    $("answer").textContent =
-      "Смотрите закреплённую вкладку «захват». Вернитесь на вкладку встречи.";
-  } catch (e) {
-    workLog("error", String(e?.message || e));
-    setStatus("bad", "ошибка");
-    $("answer").textContent = String(e?.message || e);
   }
 }
 
-async function onAsk() {
+async function onToggleDictation() {
+  if (isDictating) {
+    const res = await chrome.runtime.sendMessage({ type: "STOP_DICTATION" });
+    if (res?.ok) {
+      isDictating = false;
+      $("btnDictation").textContent = "Спросить у агента";
+      $("btnDictation").classList.remove("btn--danger");
+      $("btnDictation").classList.add("btn--primary");
+      setStatus("ok", "готово");
+      // подгрузить надиктованный текст
+      const { dictationDraftText = "" } = await chrome.storage.local.get("dictationDraftText");
+      if (dictationDraftText) {
+        $("question").value = dictationDraftText;
+        await chrome.storage.local.set({ questionDraftText: dictationDraftText });
+      }
+      updateSendButtonState();
+    }
+  } else {
+    await persistWhisperSettingsForCapture();
+    const res = await chrome.runtime.sendMessage({ type: "START_DICTATION" });
+    if (res?.ok) {
+      isDictating = true;
+      $("btnDictation").textContent = "Остановить запись вопроса";
+      $("btnDictation").classList.remove("btn--primary");
+      $("btnDictation").classList.add("btn--danger");
+      setStatus("ok", "диктовка…");
+    } else {
+      setStatus("bad", res?.error || "ошибка");
+    }
+  }
+}
+
+async function onSendToAgent() {
   setStatus("idle", "отправляем…");
   const state = await getBridgeState();
   const sessionId = state.sessionId;
@@ -244,7 +318,7 @@ async function onAsk() {
   }
   if (!sessionId) {
     setStatus("bad", "нет session_id");
-    $("answer").textContent = "Сначала нажмите «Начать работу» (создаётся сессия).";
+    $("answer").textContent = "Сначала нажмите «Слушать встречу» (создаётся сессия).";
     return;
   }
 
@@ -257,7 +331,7 @@ async function onAsk() {
   const meeting = await buildPromptContextText();
   $("meetingContext").value = meeting;
 
-  const model = $("model").value || "auto";
+  const model = getSelectedModel();
 
   try {
     const { json } = await httpJSON("/agent/ask", {
@@ -272,7 +346,9 @@ async function onAsk() {
       return;
     }
     setStatus("ok", "готово");
-    $("answer").textContent = json.agent?.stdout || "(пусто)";
+    const answerText = json.agent?.stdout || "(пусто)";
+    $("answer").textContent = answerText;
+    await chrome.storage.local.set({ lastAnswer: answerText });
   } catch (e) {
     setStatus("bad", "ошибка");
     $("answer").textContent = String(e?.message || e);
@@ -286,65 +362,11 @@ async function persistWhisperSettingsForCapture() {
     whisperModel: $("whisperModel").value,
     whisperLanguage: $("whisperLanguage").value.trim(),
     whisperTask: "transcribe",
-    whisperUseVad: $("whisperUseVad").checked,
-    pauseMeetingWhileDictating: $("pauseMeetingWhileDictating").checked,
+    whisperUseVad: true,
+    pauseMeetingWhileDictating: true,
     contextWindowMinutes:
       Number.isFinite(ctxMin) && ctxMin > 0 ? ctxMin : DEFAULTS.contextWindowMinutes,
   });
-}
-
-async function onStartDictation() {
-  setStatus("idle", "диктовка…");
-  try {
-    await persistWhisperSettingsForCapture();
-    const res = await chrome.runtime.sendMessage({ type: "START_DICTATION" });
-    if (res?.ok) {
-      setStatus("ok", "диктовка");
-    } else {
-      setStatus("bad", "ошибка");
-      $("answer").textContent = res?.error || "не удалось";
-    }
-  } catch (e) {
-    setStatus("bad", "ошибка");
-    $("answer").textContent = String(e?.message || e);
-  }
-}
-
-async function onStopDictation() {
-  setStatus("idle", "стоп…");
-  try {
-    const res = await chrome.runtime.sendMessage({ type: "STOP_DICTATION" });
-    if (res?.ok) {
-      setStatus("ok", "готово");
-      const { dictationDraftText = "" } = await chrome.storage.local.get("dictationDraftText");
-      if (dictationDraftText) {
-        $("question").value = dictationDraftText;
-        await chrome.storage.local.set({ questionDraftText: dictationDraftText });
-      }
-    } else {
-      setStatus("bad", "ошибка");
-      $("answer").textContent = res?.error || "не удалось";
-    }
-  } catch (e) {
-    setStatus("bad", "ошибка");
-    $("answer").textContent = String(e?.message || e);
-  }
-}
-
-async function onStopCapture() {
-  setStatus("idle", "стоп…");
-  try {
-    const res = await chrome.runtime.sendMessage({ type: "STOP_CAPTURE" });
-    if (res?.ok) {
-      setStatus("ok", "захват остановлен");
-    } else {
-      setStatus("bad", "ошибка");
-      $("answer").textContent = res?.error || "не удалось";
-    }
-  } catch (e) {
-    setStatus("bad", "ошибка");
-    $("answer").textContent = String(e?.message || e);
-  }
 }
 
 function setupStorageSync() {
@@ -371,17 +393,19 @@ function setupStorageSync() {
 async function main() {
   await loadState();
   setStatus("idle", "готово");
-  $("answer").textContent = "(пусто)";
 
-  $("btnStartWork").addEventListener("click", onStartWork);
-  $("saveSettings").addEventListener("click", onSave);
-  $("ask").addEventListener("click", onAsk);
-  $("stopCapture").addEventListener("click", onStopCapture);
-  $("startDictation").addEventListener("click", onStartDictation);
-  $("stopDictation").addEventListener("click", onStopDictation);
+  $("btnCapture").addEventListener("click", onToggleCapture);
+  $("btnDictation").addEventListener("click", onToggleDictation);
+  $("btnSendToAgent").addEventListener("click", onSendToAgent);
+
+  $("dismissReminder").addEventListener("click", () => {
+    $("reminder").style.display = "none";
+    chrome.storage.local.set({ reminderDismissed: true });
+  });
 
   $("question").addEventListener("input", () => {
     chrome.storage.local.set({ questionDraftText: $("question").value }).catch(() => {});
+    updateSendButtonState();
   });
 
   $("contextWindowMinutes").addEventListener("change", () => {
@@ -391,6 +415,12 @@ async function main() {
   });
 
   $("model").addEventListener("change", () => {
+    const isCustom = $("model").value === "custom";
+    $("modelCustom").classList.toggle("field__input--hidden", !isCustom);
+    persistAllFromInputs().catch(() => {});
+  });
+
+  $("modelCustom").addEventListener("change", () => {
     persistAllFromInputs().catch(() => {});
   });
 

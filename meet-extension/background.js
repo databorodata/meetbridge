@@ -236,7 +236,6 @@ async function executeStartCapture(opts = {}) {
       "whisperModel",
       "whisperLanguage",
       "whisperTask",
-      "whisperUseVad",
     ]);
     const wsUrl = (s.whisperWsUrl || "ws://127.0.0.1:9090").trim();
     const { host, port } = parseWsUrl(wsUrl);
@@ -256,7 +255,7 @@ async function executeStartCapture(opts = {}) {
         language: lang || null,
         task: s.whisperTask || "transcribe",
         modelSize: s.whisperModel || "small",
-        useVad: s.whisperUseVad !== false,
+        useVad: true,
       },
     });
     await chrome.storage.local.set({ capturedMeetTabId: meetTabId });
@@ -297,7 +296,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg?.type === "START_CAPTURE") {
     (async () => {
-      const res = await executeStartCapture({ preserveTranscript: false });
+      const res = await executeStartCapture({ preserveTranscript: msg.preserveTranscript === true });
       sendResponse(res);
     })();
     return true;
@@ -331,12 +330,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           "whisperModel",
           "whisperLanguage",
           "whisperTask",
-          "whisperUseVad",
-          "pauseMeetingWhileDictating",
           "capturing",
         ]);
 
-        const pause = s.pauseMeetingWhileDictating !== false;
+        const pause = true; // всегда паузим встречу во время диктовки
         const wasCapturing = s.capturing === true;
 
         await clearDictationBuffer();
@@ -376,7 +373,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             language: lang || null,
             task: s.whisperTask || "transcribe",
             modelSize: s.whisperModel || "small",
-            useVad: s.whisperUseVad !== false,
+            useVad: true,
           },
         });
 
