@@ -205,6 +205,7 @@ async function onToggleCapture() {
     const res = await chrome.runtime.sendMessage({ type: "STOP_CAPTURE" });
     if (res?.ok) {
       isCapturing = false;
+      await saveState({ capturing: false });
       $("btnCapture").textContent = "Слушать встречу";
       $("btnCapture").classList.remove("btn--active");
       setStatus("ok", "пауза");
@@ -261,6 +262,7 @@ async function onToggleCapture() {
       }
       workLog("capture_ok", "ok");
       isCapturing = true;
+      await saveState({ capturing: true });
       $("btnCapture").textContent = "Перестать слушать";
       $("btnCapture").classList.add("btn--active");
       setStatus("ok", "слушаю встречу");
@@ -277,14 +279,16 @@ async function onToggleDictation() {
     const res = await chrome.runtime.sendMessage({ type: "STOP_DICTATION" });
     if (res?.ok) {
       isDictating = false;
+      await saveState({ dictating: false });
       $("btnDictation").textContent = "Спросить у агента";
       $("btnDictation").classList.remove("btn--active");
-      setStatus("ok", "готово");
-      // подгрузить надиктованный текст
+      setStatus("ok", "вопрос записан");
+      // Небольшая задержка, чтобы последний чанк успел записаться в storage
+      await new Promise((r) => setTimeout(r, 400));
       const { dictationDraftText = "" } = await chrome.storage.local.get("dictationDraftText");
       if (dictationDraftText) {
         $("question").value = dictationDraftText;
-        await chrome.storage.local.set({ questionDraftText: dictationDraftText });
+        await saveState({ questionDraftText: dictationDraftText });
       }
       updateSendButtonState();
     }
@@ -293,6 +297,7 @@ async function onToggleDictation() {
     const res = await chrome.runtime.sendMessage({ type: "START_DICTATION" });
     if (res?.ok) {
       isDictating = true;
+      await saveState({ dictating: true });
       $("btnDictation").textContent = "Остановить запись вопроса";
       $("btnDictation").classList.add("btn--active");
       setStatus("ok", "диктовка…");
@@ -374,14 +379,12 @@ function setupStorageSync() {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
     if (!changes.dictationDraftText) return;
+    if (!isDictating) return;
     const next = changes.dictationDraftText.newValue || "";
-    (async () => {
-      const s = await chrome.storage.local.get("dictating");
-      if (!s.dictating) return;
-      if (document.activeElement === $("question")) return;
-      $("question").value = next;
-      await chrome.storage.local.set({ questionDraftText: next });
-    })().catch(() => {});
+    if (document.activeElement === $("question")) return;
+    $("question").value = next;
+    chrome.storage.local.set({ questionDraftText: next }).catch(() => {});
+    updateSendButtonState();
   });
 }
 
@@ -396,6 +399,16 @@ async function main() {
   $("dismissReminder").addEventListener("click", () => {
     $("reminder").style.display = "none";
     chrome.storage.local.set({ reminderDismissed: true });
+  });
+
+  $("clearMeeting").addEventListener("click", async () => {
+    $("meetingContext").value = "";
+    await chrome.storage.local.set({ meetTranscriptDeltas: [] });
+  });
+
+  $("copyMeeting").addEventListener("click", () => {
+    const text = $("meetingContext").value.trim();
+    if (text) navigator.clipboard.writeText(text).catch(() => {});
   });
 
   $("clearQuestion").addEventListener("click", async () => {

@@ -9,12 +9,18 @@
   <body>
     <header class="header">
       <div class="title">Meet Assist</div>
-      <div id="status" class="status status--idle">готово</div>
     </header>
+    <div id="status" class="status-bar status--idle">готово</div>
+
+    <!-- Напоминание (dismissable) — вверху -->
+    <div id="reminder" class="reminder">
+      <span>Перед тем как приступить к прослушиванию, убедись что в Настройках указан путь к репозиторию</span>
+      <button id="dismissReminder" class="reminder__close" type="button">&times;</button>
+    </div>
 
     <!-- Настройки (свёрнуты) -->
     <details class="details" id="detailsSettings">
-      <summary class="details__summary">Настройки</summary>
+      <summary class="details__summary"><svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,4 10,8 6,12"/></svg>Настройки</summary>
       <div class="details__body">
         <label class="field">
           <div class="field__label">Repo path (git-репозиторий для агента)</div>
@@ -75,15 +81,17 @@
       </div>
     </details>
 
-    <!-- Напоминание (dismissable) -->
-    <div id="reminder" class="reminder">
-      <span>Перед тем как приступить к прослушиванию, убедись что в Настройках указан путь к репозиторию</span>
-      <button id="dismissReminder" class="reminder__close" type="button">&times;</button>
-    </div>
-
     <!-- Захват встречи -->
     <section class="card">
       <button id="btnCapture" class="btn btn--primary" type="button">Слушать встречу</button>
+      <div class="textarea-toolbar">
+        <button class="icon-btn" id="copyMeeting" type="button" title="Копировать">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="2"/><path d="M11 5V3a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></svg>
+        </button>
+        <button class="icon-btn" id="clearMeeting" type="button" title="Очистить">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,4 13,4"/><path d="M6 4V2h4v2"/><rect x="4" y="4" width="8" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="12"/><line x1="10" y1="7" x2="10" y2="12"/></svg>
+        </button>
+      </div>
       <textarea
         id="meetingContext"
         class="field__textarea field__textarea--readonly"
