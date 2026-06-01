@@ -54,9 +54,9 @@
         <label class="field">
           <div class="field__label">Язык аудио</div>
           <select id="whisperLanguage" class="select">
-            <option value="" selected>авто (определяется автоматически)</option>
+            <option value="">авто (определяется автоматически)</option>
             <option value="ru">Русский</option>
-            <option value="en">English</option>
+            <option value="en" selected>English</option>
             <option value="uk">Українська</option>
             <option value="de">Deutsch</option>
             <option value="fr">Français</option>
@@ -96,14 +96,32 @@
     <!-- Вопрос -->
     <section class="card">
       <button id="btnDictation" class="btn btn--primary" type="button">Спросить у агента</button>
+      <div class="textarea-toolbar">
+        <button class="icon-btn" id="copyQuestion" type="button" title="Копировать">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="2"/><path d="M11 5V3a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></svg>
+        </button>
+        <button class="icon-btn" id="clearQuestion" type="button" title="Очистить">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,4 13,4"/><path d="M6 4V2h4v2"/><rect x="4" y="4" width="8" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="12"/><line x1="10" y1="7" x2="10" y2="12"/></svg>
+        </button>
+      </div>
       <textarea id="question" class="field__textarea" rows="3" placeholder="надиктованный вопрос..."></textarea>
       <button id="btnSendToAgent" class="btn btn--accent" type="button" disabled>Отправить агенту</button>
     </section>
 
     <!-- Ответ -->
     <section class="card">
-      <div class="card__title">Ответ</div>
-      <pre id="answer" class="answer">(пусто)</pre>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+        <span class="card__title" style="margin-bottom:0;">Ответ</span>
+        <div class="textarea-toolbar">
+          <button class="icon-btn" id="copyAnswer" type="button" title="Копировать">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="2"/><path d="M11 5V3a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></svg>
+          </button>
+          <button class="icon-btn" id="clearAnswer" type="button" title="Очистить">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,4 13,4"/><path d="M6 4V2h4v2"/><rect x="4" y="4" width="8" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="12"/><line x1="10" y1="7" x2="10" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="answer" class="answer">(пусто)</div>
     </section>
 
     <script src="popup.js"></script>

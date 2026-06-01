@@ -7,7 +7,7 @@ const WORK_LOG_PREFIX = "[meet-assist:work]";
 const DEFAULTS = {
   repoPath: "",
   whisperModel: "small",
-  whisperLanguage: "",
+  whisperLanguage: "en",
   contextWindowMinutes: 3,
   sessionId: "",
   model: "auto",
@@ -105,19 +105,19 @@ async function loadState() {
 
   await refreshMeetingContextFromTranscript();
 
+  updateSendButtonState();
+
   // Восстановить состояние кнопок
   const { capturing = false, dictating = false } = await chrome.storage.local.get(["capturing", "dictating"]);
   isCapturing = capturing;
   isDictating = dictating;
   if (isCapturing) {
     $("btnCapture").textContent = "Перестать слушать";
-    $("btnCapture").classList.remove("btn--primary");
-    $("btnCapture").classList.add("btn--danger");
+    $("btnCapture").classList.add("btn--active");
   }
   if (isDictating) {
     $("btnDictation").textContent = "Остановить запись вопроса";
-    $("btnDictation").classList.remove("btn--primary");
-    $("btnDictation").classList.add("btn--danger");
+    $("btnDictation").classList.add("btn--active");
   }
 
   // Dismissable reminder
@@ -206,8 +206,7 @@ async function onToggleCapture() {
     if (res?.ok) {
       isCapturing = false;
       $("btnCapture").textContent = "Слушать встречу";
-      $("btnCapture").classList.remove("btn--danger");
-      $("btnCapture").classList.add("btn--primary");
+      $("btnCapture").classList.remove("btn--active");
       setStatus("ok", "пауза");
     }
   } else {
@@ -254,8 +253,7 @@ async function onToggleCapture() {
       workLog("session_ok", `session_id=${json.session_id}`);
 
       workLog("capture", "START_CAPTURE");
-      // preserveTranscript: true если повторный запуск после паузы (isCapturing был true до этого)
-      const cap = await chrome.runtime.sendMessage({ type: "START_CAPTURE", preserveTranscript: false });
+      const cap = await chrome.runtime.sendMessage({ type: "START_CAPTURE", preserveTranscript: true });
       if (!cap?.ok) {
         workLog("capture_fail", cap?.error || "unknown");
         setStatus("bad", cap?.error || "захват не запущен");
@@ -264,8 +262,7 @@ async function onToggleCapture() {
       workLog("capture_ok", "ok");
       isCapturing = true;
       $("btnCapture").textContent = "Перестать слушать";
-      $("btnCapture").classList.remove("btn--primary");
-      $("btnCapture").classList.add("btn--danger");
+      $("btnCapture").classList.add("btn--active");
       setStatus("ok", "слушаю встречу");
     } catch (e) {
       workLog("error", String(e?.message || e));
@@ -281,8 +278,7 @@ async function onToggleDictation() {
     if (res?.ok) {
       isDictating = false;
       $("btnDictation").textContent = "Спросить у агента";
-      $("btnDictation").classList.remove("btn--danger");
-      $("btnDictation").classList.add("btn--primary");
+      $("btnDictation").classList.remove("btn--active");
       setStatus("ok", "готово");
       // подгрузить надиктованный текст
       const { dictationDraftText = "" } = await chrome.storage.local.get("dictationDraftText");
@@ -298,8 +294,7 @@ async function onToggleDictation() {
     if (res?.ok) {
       isDictating = true;
       $("btnDictation").textContent = "Остановить запись вопроса";
-      $("btnDictation").classList.remove("btn--primary");
-      $("btnDictation").classList.add("btn--danger");
+      $("btnDictation").classList.add("btn--active");
       setStatus("ok", "диктовка…");
     } else {
       setStatus("bad", res?.error || "ошибка");
@@ -401,6 +396,27 @@ async function main() {
   $("dismissReminder").addEventListener("click", () => {
     $("reminder").style.display = "none";
     chrome.storage.local.set({ reminderDismissed: true });
+  });
+
+  $("clearQuestion").addEventListener("click", async () => {
+    $("question").value = "";
+    await chrome.storage.local.set({ questionDraftText: "", dictationDraftText: "" });
+    updateSendButtonState();
+  });
+
+  $("copyQuestion").addEventListener("click", () => {
+    const text = $("question").value.trim();
+    if (text) navigator.clipboard.writeText(text).catch(() => {});
+  });
+
+  $("clearAnswer").addEventListener("click", async () => {
+    $("answer").textContent = "(пусто)";
+    await chrome.storage.local.set({ lastAnswer: "(пусто)" });
+  });
+
+  $("copyAnswer").addEventListener("click", () => {
+    const text = $("answer").textContent.trim();
+    if (text && text !== "(пусто)") navigator.clipboard.writeText(text).catch(() => {});
   });
 
   $("question").addEventListener("input", () => {
