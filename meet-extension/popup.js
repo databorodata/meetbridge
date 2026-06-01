@@ -2,13 +2,13 @@
 const BRIDGE_BASE_URL = "http://127.0.0.1:7337";
 const WHISPER_WS_URL = "ws://127.0.0.1:9090";
 
-const WORK_LOG_PREFIX = "[meet-assist:work]";
+const WORK_LOG_PREFIX = "[meet-bridge:work]";
 
 const DEFAULTS = {
   repoPath: "",
   whisperModel: "small",
   whisperLanguage: "en",
-  contextWindowMinutes: 3,
+  contextWindowSeconds: 180,
   sessionId: "",
   model: "auto",
   modelCustom: "",
@@ -32,20 +32,20 @@ function workLog(step, detail) {
 
 function setStatus(kind, text) {
   const el = $("status");
-  el.className = `status status--${kind}`;
+  el.className = `status-bar status--${kind}`;
   el.textContent = text;
 }
 
 async function buildPromptContextText() {
-  const { meetTranscriptDeltas = [], contextWindowMinutes: storedMin } = await chrome.storage.local.get([
+  const { meetTranscriptDeltas = [], contextWindowSeconds: storedSec } = await chrome.storage.local.get([
     "meetTranscriptDeltas",
-    "contextWindowMinutes",
+    "contextWindowSeconds",
   ]);
   const raw =
-    $("contextWindowMinutes")?.value ?? String(storedMin ?? DEFAULTS.contextWindowMinutes);
-  const minutes = Number.parseFloat(String(raw));
-  const m = Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULTS.contextWindowMinutes;
-  const ms = m * 60 * 1000;
+    $("contextWindowSeconds")?.value ?? String(storedSec ?? DEFAULTS.contextWindowSeconds);
+  const seconds = Number.parseFloat(String(raw));
+  const s = Number.isFinite(seconds) && seconds > 0 ? seconds : DEFAULTS.contextWindowSeconds;
+  const ms = s * 1000;
   const cutoff = Date.now() - ms;
   return meetTranscriptDeltas
     .filter((d) => d.ts >= cutoff)
@@ -85,8 +85,8 @@ async function loadState() {
   $("repoPath").value = state.repoPath;
   $("whisperModel").value = state.whisperModel || DEFAULTS.whisperModel;
   $("whisperLanguage").value = state.whisperLanguage ?? "";
-  $("contextWindowMinutes").value = String(
-    state.contextWindowMinutes ?? DEFAULTS.contextWindowMinutes
+  $("contextWindowSeconds").value = String(
+    state.contextWindowSeconds ?? DEFAULTS.contextWindowSeconds
   );
   $("model").value = state.model || "auto";
   $("modelCustom").value = state.modelCustom || "";
@@ -173,13 +173,13 @@ function pretty(obj) {
 }
 
 async function persistAllFromInputs() {
-  const ctxMin = Number.parseFloat($("contextWindowMinutes").value);
+  const ctxSec = Number.parseFloat($("contextWindowSeconds").value);
   await saveState({
     repoPath: $("repoPath").value.trim(),
     whisperModel: $("whisperModel").value,
     whisperLanguage: $("whisperLanguage").value.trim(),
-    contextWindowMinutes:
-      Number.isFinite(ctxMin) && ctxMin > 0 ? ctxMin : DEFAULTS.contextWindowMinutes,
+    contextWindowSeconds:
+      Number.isFinite(ctxSec) && ctxSec > 0 ? ctxSec : DEFAULTS.contextWindowSeconds,
     model: $("model").value,
     modelCustom: $("modelCustom").value.trim(),
   });
@@ -274,24 +274,29 @@ async function onToggleCapture() {
   }
 }
 
+async function stopDictation() {
+  if (!isDictating) return false;
+  const res = await chrome.runtime.sendMessage({ type: "STOP_DICTATION" });
+  if (!res?.ok) return false;
+  isDictating = false;
+  await saveState({ dictating: false });
+  $("btnDictation").textContent = "Спросить у агента";
+  $("btnDictation").classList.remove("btn--active");
+  // Пауза чтобы последний чанк успел записаться в storage
+  await new Promise((r) => setTimeout(r, 400));
+  const { dictationDraftText = "" } = await chrome.storage.local.get("dictationDraftText");
+  if (dictationDraftText) {
+    $("question").value = dictationDraftText;
+    await saveState({ questionDraftText: dictationDraftText });
+  }
+  updateSendButtonState();
+  return true;
+}
+
 async function onToggleDictation() {
   if (isDictating) {
-    const res = await chrome.runtime.sendMessage({ type: "STOP_DICTATION" });
-    if (res?.ok) {
-      isDictating = false;
-      await saveState({ dictating: false });
-      $("btnDictation").textContent = "Спросить у агента";
-      $("btnDictation").classList.remove("btn--active");
-      setStatus("ok", "вопрос записан");
-      // Небольшая задержка, чтобы последний чанк успел записаться в storage
-      await new Promise((r) => setTimeout(r, 400));
-      const { dictationDraftText = "" } = await chrome.storage.local.get("dictationDraftText");
-      if (dictationDraftText) {
-        $("question").value = dictationDraftText;
-        await saveState({ questionDraftText: dictationDraftText });
-      }
-      updateSendButtonState();
-    }
+    const stopped = await stopDictation();
+    if (stopped) setStatus("ok", "вопрос записан");
   } else {
     await persistWhisperSettingsForCapture();
     const res = await chrome.runtime.sendMessage({ type: "START_DICTATION" });
@@ -308,6 +313,9 @@ async function onToggleDictation() {
 }
 
 async function onSendToAgent() {
+  if (isDictating) {
+    await stopDictation();
+  }
   setStatus("idle", "отправляем…");
   const state = await getBridgeState();
   const sessionId = state.sessionId;
@@ -322,10 +330,10 @@ async function onSendToAgent() {
     return;
   }
 
-  const ctxMin = Number.parseFloat($("contextWindowMinutes").value);
+  const ctxSec = Number.parseFloat($("contextWindowSeconds").value);
   await saveState({
-    contextWindowMinutes:
-      Number.isFinite(ctxMin) && ctxMin > 0 ? ctxMin : DEFAULTS.contextWindowMinutes,
+    contextWindowSeconds:
+      Number.isFinite(ctxSec) && ctxSec > 0 ? ctxSec : DEFAULTS.contextWindowSeconds,
   });
 
   const meeting = await buildPromptContextText();
@@ -348,7 +356,9 @@ async function onSendToAgent() {
     setStatus("ok", "готово");
     const answerText = json.agent?.stdout || "(пусто)";
     $("answer").textContent = answerText;
-    await chrome.storage.local.set({ lastAnswer: answerText });
+    await chrome.storage.local.set({ lastAnswer: answerText, reminderDismissed: false });
+    // Показываем reminder снова — напомнить, что можно менять repo при следующем вопросе
+    $("reminder").style.display = "";
   } catch (e) {
     setStatus("bad", "ошибка");
     $("answer").textContent = String(e?.message || e);
@@ -356,7 +366,7 @@ async function onSendToAgent() {
 }
 
 async function persistWhisperSettingsForCapture() {
-  const ctxMin = Number.parseFloat($("contextWindowMinutes").value);
+  const ctxSec = Number.parseFloat($("contextWindowSeconds").value);
   await chrome.storage.local.set({
     whisperWsUrl: WHISPER_WS_URL,
     whisperModel: $("whisperModel").value,
@@ -364,8 +374,8 @@ async function persistWhisperSettingsForCapture() {
     whisperTask: "transcribe",
     whisperUseVad: true,
     pauseMeetingWhileDictating: true,
-    contextWindowMinutes:
-      Number.isFinite(ctxMin) && ctxMin > 0 ? ctxMin : DEFAULTS.contextWindowMinutes,
+    contextWindowSeconds:
+      Number.isFinite(ctxSec) && ctxSec > 0 ? ctxSec : DEFAULTS.contextWindowSeconds,
   });
 }
 
@@ -437,7 +447,7 @@ async function main() {
     updateSendButtonState();
   });
 
-  $("contextWindowMinutes").addEventListener("change", () => {
+  $("contextWindowSeconds").addEventListener("change", () => {
     persistAllFromInputs()
       .then(() => refreshMeetingContextFromTranscript())
       .catch(() => {});

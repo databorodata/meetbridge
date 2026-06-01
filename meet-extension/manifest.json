@@ -1,11 +1,23 @@
 {
   "manifest_version": 3,
-  "name": "Meet Assist",
+  "name": "MeetBridge",
   "version": "0.2.0",
-  "description": "Локальный мост + WhisperLive: транскрипт встречи и запрос к агенту.",
+  "description": "Мост между встречей и Cursor: транскрипт + вопрос агенту по локальному репозиторию.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
-    "default_title": "Meet Assist",
-    "default_popup": "popup.html"
+    "default_title": "MeetBridge",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "permissions": ["storage", "tabs", "tabCapture"],
   "host_permissions": [

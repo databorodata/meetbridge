@@ -3,8 +3,8 @@
   --color-1: #f9f6f1;
   --color-2: #e4ece5;
   --color-3: #b3dbbd;
-  --color-4: #74b9a7;
-  --color-5: #578572;
+  --color-4: #4e9a88;
+  --color-5: #3a7060;
 
   /* Фоны (светлая тема) */
   --bg: #ffffff;
@@ -41,11 +41,8 @@
 body {
   margin: 0;
   width: 460px;
-  min-height: 560px;
-  background:
-    radial-gradient(900px 400px at -10% -20%, rgba(179, 219, 189, 0.35), transparent 55%),
-    radial-gradient(700px 350px at 110% 0%, rgba(116, 185, 167, 0.2), transparent 50%),
-    var(--bg);
+  min-height: 700px;
+  background: #ffffff;
   color: var(--text);
   font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
   padding: 12px;
@@ -54,7 +51,7 @@ body {
 .header {
   display: flex;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .title {
@@ -67,7 +64,7 @@ body {
 .status-bar {
   width: 100%;
   padding: 5px 10px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
@@ -145,6 +142,15 @@ body {
   padding: 8px 10px;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23555555' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='4,6 8,10 12,6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
 }
 
 .field__input:focus,
@@ -232,7 +238,7 @@ details[open] .details__summary .chevron {
 }
 
 .details__body {
-  padding: 0 12px 12px;
+  padding: 10px 12px 12px;
   border-top: 1px solid var(--border);
 }
 
@@ -379,7 +385,7 @@ details[open] .details__summary .chevron {
 }
 
 .icon-btn {
-  background: none;
+  background: #ffffff;
   border: 1px solid var(--border);
   border-radius: 7px;
   padding: 4px 6px;

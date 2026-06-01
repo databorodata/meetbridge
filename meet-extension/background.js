@@ -5,6 +5,27 @@
 let captureTabId = null;
 let dictationTabId = null;
 
+// Восстановление ID вкладок после перезапуска service worker
+(async () => {
+  const s = await chrome.storage.local.get(["_captureTabId", "_dictationTabId"]);
+  if (s._captureTabId != null) {
+    try {
+      await chrome.tabs.get(s._captureTabId);
+      captureTabId = s._captureTabId;
+    } catch {
+      chrome.storage.local.remove("_captureTabId").catch(() => {});
+    }
+  }
+  if (s._dictationTabId != null) {
+    try {
+      await chrome.tabs.get(s._dictationTabId);
+      dictationTabId = s._dictationTabId;
+    } catch {
+      chrome.storage.local.remove("_dictationTabId").catch(() => {});
+    }
+  }
+})();
+
 function normalizeWhitespace(text) {
   return String(text || "").replace(/[ \t\r]+/g, " ").trim();
 }
@@ -113,12 +134,19 @@ async function ensureCaptureTab() {
     }
   }
 
+  // Закрываем старую зависшую вкладку, если она есть в storage
+  const saved = await chrome.storage.local.get("_captureTabId");
+  if (saved._captureTabId != null && saved._captureTabId !== captureTabId) {
+    chrome.tabs.remove(saved._captureTabId).catch(() => {});
+  }
+
   const tab = await chrome.tabs.create({
     url: chrome.runtime.getURL("capture.html"),
     active: false,
     pinned: true,
   });
   captureTabId = tab.id;
+  await chrome.storage.local.set({ _captureTabId: captureTabId });
 
   await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -149,12 +177,19 @@ async function ensureDictationTab() {
     }
   }
 
+  // Закрываем старую зависшую вкладку, если она есть в storage
+  const savedD = await chrome.storage.local.get("_dictationTabId");
+  if (savedD._dictationTabId != null && savedD._dictationTabId !== dictationTabId) {
+    chrome.tabs.remove(savedD._dictationTabId).catch(() => {});
+  }
+
   const tab = await chrome.tabs.create({
     url: chrome.runtime.getURL("dictation.html"),
     active: false,
     pinned: true,
   });
   dictationTabId = tab.id;
+  await chrome.storage.local.set({ _dictationTabId: dictationTabId });
 
   await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -415,7 +450,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           await chrome.storage.local.set({ dictationPausedMeetingCapture: false });
           const res = await executeStartCapture({ preserveTranscript: true });
           if (!res.ok) {
-            console.warn("[meet-assist] resume capture after dictation failed:", res.error);
+            console.warn("[meet-bridge] resume capture after dictation failed:", res.error);
           }
         }
 
