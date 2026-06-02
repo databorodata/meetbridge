@@ -59,6 +59,19 @@ body {
   font-weight: 700;
   letter-spacing: 0.2px;
   color: var(--text);
+  flex: 1;
+}
+
+.icon-btn--reset {
+  margin-left: auto;
+  color: var(--muted);
+  opacity: 0.6;
+}
+.icon-btn--reset:hover {
+  color: var(--danger);
+  opacity: 1;
+  background: rgba(201, 77, 99, 0.08);
+  border-color: rgba(201, 77, 99, 0.3);
 }
 
 .status-bar {
@@ -69,21 +82,17 @@ body {
   border-radius: 8px;
   font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
   color: var(--muted);
-  background: var(--panel);
-  text-align: center;
+  background: #ffffff;
+  text-align: left;
 }
 .status--ok {
-  border-color: rgba(87, 133, 114, 0.4);
-  color: var(--color-5);
-  background: rgba(179, 219, 189, 0.25);
+  color: var(--text);
 }
 .status--idle {
-  color: var(--muted);
+  color: var(--text);
 }
 .status--bad {
-  border-color: rgba(201, 77, 99, 0.4);
   color: var(--danger);
-  background: rgba(201, 77, 99, 0.08);
 }
 
 .card {

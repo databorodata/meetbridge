@@ -262,7 +262,8 @@ async function onToggleCapture() {
       }
       workLog("capture_ok", "ok");
       isCapturing = true;
-      await saveState({ capturing: true });
+      // captureWasPaused сбрасываем: это новый старт (не возобновление)
+      await saveState({ capturing: true, captureWasPaused: false });
       $("btnCapture").textContent = "Перестать слушать";
       $("btnCapture").classList.add("btn--active");
       setStatus("ok", "слушаю встречу");
@@ -276,8 +277,10 @@ async function onToggleCapture() {
 
 async function stopDictation() {
   if (!isDictating) return false;
-  const res = await chrome.runtime.sendMessage({ type: "STOP_DICTATION" });
-  if (!res?.ok) return false;
+  // Шлём stop, но сбрасываем UI и состояние независимо от ответа:
+  // background может вернуть ok:false если вкладка диктовки уже закрылась,
+  // но аудио-запись всё равно прекратилась и текст есть в storage.
+  await chrome.runtime.sendMessage({ type: "STOP_DICTATION" }).catch(() => {});
   isDictating = false;
   await saveState({ dictating: false });
   $("btnDictation").textContent = "Спросить у агента";
@@ -316,17 +319,27 @@ async function onSendToAgent() {
   if (isDictating) {
     await stopDictation();
   }
+
+  // Блокируем кнопку на время запроса — предотвращает дубли
+  const sendBtn = $("btnSendToAgent");
+  sendBtn.disabled = true;
+  sendBtn.textContent = "Жду ответа…";
+
   setStatus("idle", "отправляем…");
   const state = await getBridgeState();
   const sessionId = state.sessionId;
   const question = $("question").value.trim();
   if (!question) {
     setStatus("bad", "вопрос пуст");
+    sendBtn.textContent = "Отправить агенту";
+    updateSendButtonState();
     return;
   }
   if (!sessionId) {
     setStatus("bad", "нет session_id");
     $("answer").textContent = "Сначала нажмите «Слушать встречу» (создаётся сессия).";
+    sendBtn.textContent = "Отправить агенту";
+    updateSendButtonState();
     return;
   }
 
@@ -362,6 +375,9 @@ async function onSendToAgent() {
   } catch (e) {
     setStatus("bad", "ошибка");
     $("answer").textContent = String(e?.message || e);
+  } finally {
+    sendBtn.textContent = "Отправить агенту";
+    updateSendButtonState();
   }
 }
 
@@ -461,6 +477,48 @@ async function main() {
 
   $("modelCustom").addEventListener("change", () => {
     persistAllFromInputs().catch(() => {});
+  });
+
+  $("btnReset").addEventListener("click", async () => {
+    if (!confirm("Сбросить всё? Транскрипт, вопрос и ответ будут очищены.")) return;
+
+    // Остановить всё активное
+    if (isCapturing) {
+      await chrome.runtime.sendMessage({ type: "STOP_CAPTURE" }).catch(() => {});
+      isCapturing = false;
+    }
+    if (isDictating) {
+      await chrome.runtime.sendMessage({ type: "STOP_DICTATION" }).catch(() => {});
+      isDictating = false;
+    }
+
+    // Очистить storage
+    await chrome.storage.local.set({
+      meetTranscriptDeltas: [],
+      meetTranscriptPrev: "",
+      dictationDraftText: "",
+      dictationTranscriptDeltas: [],
+      dictationTranscriptPrev: "",
+      questionDraftText: "",
+      lastAnswer: "(пусто)",
+      capturing: false,
+      dictating: false,
+      captureWasPaused: false,
+      reminderDismissed: false,
+      sessionId: "",
+    });
+
+    // Сбросить UI
+    $("meetingContext").value = "";
+    $("question").value = "";
+    $("answer").textContent = "(пусто)";
+    $("btnCapture").textContent = "Слушать встречу";
+    $("btnCapture").classList.remove("btn--active");
+    $("btnDictation").textContent = "Спросить у агента";
+    $("btnDictation").classList.remove("btn--active");
+    $("reminder").style.display = "";
+    updateSendButtonState();
+    setStatus("idle", "готово");
   });
 
   setupAutosaveSettings();
