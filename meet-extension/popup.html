@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,32 +9,32 @@
   <body>
     <header class="header">
       <div class="title">MeetBridge</div>
-      <button id="btnReset" class="icon-btn icon-btn--reset" type="button" title="Сбросить всё">
+      <button id="btnReset" class="icon-btn icon-btn--reset" type="button" title="Reset all">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
           <path d="M2.5 8a5.5 5.5 0 1 0 1.1-3.3"/>
           <polyline points="1,3.5 2.5,5 4,3.5"/>
         </svg>
       </button>
     </header>
-    <div id="status" class="status-bar status--idle">готово</div>
+    <div id="status" class="status-bar status--idle">ready</div>
 
-    <!-- Напоминание (dismissable) — вверху -->
+    <!-- Dismissable reminder — at the top -->
     <div id="reminder" class="reminder">
-      <span>Перед тем как приступить к прослушиванию, убедись что в Настройках указан путь к репозиторию</span>
+      <span>Before you start listening, make sure Settings contains the path to your repository</span>
       <button id="dismissReminder" class="reminder__close" type="button">&times;</button>
     </div>
 
-    <!-- Настройки (свёрнуты) -->
+    <!-- Settings (collapsed) -->
     <details class="details" id="detailsSettings">
-      <summary class="details__summary"><svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,4 10,8 6,12"/></svg>Настройки</summary>
+      <summary class="details__summary"><svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,4 10,8 6,12"/></svg>Settings</summary>
       <div class="details__body">
         <label class="field">
-          <div class="field__label">Введите абсолютный путь к репозиторию расположенному локально на вашем устройстве</div>
-          <input id="repoPath" class="field__input" type="text" placeholder="Например: /Users/username/projects/my-repo" />
+          <div class="field__label">Enter the absolute path to a repository on your local machine</div>
+          <input id="repoPath" class="field__input" type="text" placeholder="e.g. /Users/username/projects/my-repo" />
         </label>
 
         <label class="field">
-          <div class="field__label">Модель агента</div>
+          <div class="field__label">Agent model</div>
           <select id="model" class="select">
             <option value="auto" selected>auto</option>
             <option value="claude-4-sonnet">claude-4-sonnet</option>
@@ -43,18 +43,18 @@
             <option value="gpt-5.3-codex">gpt-5.3-codex</option>
             <option value="composer-2-fast">composer-2-fast</option>
             <option value="composer-2.5-fast">composer-2.5-fast</option>
-            <option value="custom">другая...</option>
+            <option value="custom">other...</option>
           </select>
-          <input id="modelCustom" class="field__input field__input--hidden" type="text" placeholder="slug модели" />
+          <input id="modelCustom" class="field__input field__input--hidden" type="text" placeholder="model slug" />
         </label>
 
         <label class="field">
-          <div class="field__label">Контекст встречи: последние N секунд</div>
+          <div class="field__label">Meeting context: last N seconds</div>
           <input id="contextWindowSeconds" class="field__input" type="number" min="10" max="7200" step="10" value="180" />
         </label>
 
         <label class="field">
-          <div class="field__label">Whisper: модель</div>
+          <div class="field__label">Whisper: model</div>
           <select id="whisperModel" class="select">
             <option value="tiny">tiny</option>
             <option value="base">base</option>
@@ -64,37 +64,37 @@
         </label>
 
         <label class="field">
-          <div class="field__label">Язык аудио</div>
+          <div class="field__label">Audio language</div>
           <select id="whisperLanguage" class="select">
-            <option value="">авто (определяется автоматически)</option>
-            <option value="ru">Русский</option>
+            <option value="">auto (detected automatically)</option>
+            <option value="ru">Russian</option>
             <option value="en" selected>English</option>
-            <option value="uk">Українська</option>
-            <option value="de">Deutsch</option>
-            <option value="fr">Français</option>
-            <option value="es">Español</option>
-            <option value="it">Italiano</option>
-            <option value="pt">Português</option>
-            <option value="zh">中文</option>
-            <option value="ja">日本語</option>
-            <option value="ko">한국어</option>
-            <option value="ar">العربية</option>
-            <option value="pl">Polski</option>
-            <option value="nl">Nederlands</option>
-            <option value="tr">Türkçe</option>
+            <option value="uk">Ukrainian</option>
+            <option value="de">German</option>
+            <option value="fr">French</option>
+            <option value="es">Spanish</option>
+            <option value="it">Italian</option>
+            <option value="pt">Portuguese</option>
+            <option value="zh">Chinese</option>
+            <option value="ja">Japanese</option>
+            <option value="ko">Korean</option>
+            <option value="ar">Arabic</option>
+            <option value="pl">Polish</option>
+            <option value="nl">Dutch</option>
+            <option value="tr">Turkish</option>
           </select>
         </label>
       </div>
     </details>
 
-    <!-- Захват встречи -->
+    <!-- Meeting capture -->
     <section class="card">
-      <button id="btnCapture" class="btn btn--primary" type="button">Слушать встречу</button>
+      <button id="btnCapture" class="btn btn--primary" type="button">Listen to meeting</button>
       <div class="textarea-toolbar">
-        <button class="icon-btn" id="copyMeeting" type="button" title="Копировать">
+        <button class="icon-btn" id="copyMeeting" type="button" title="Copy">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="2"/><path d="M11 5V3a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></svg>
         </button>
-        <button class="icon-btn" id="clearMeeting" type="button" title="Очистить">
+        <button class="icon-btn" id="clearMeeting" type="button" title="Clear">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,4 13,4"/><path d="M6 4V2h4v2"/><rect x="4" y="4" width="8" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="12"/><line x1="10" y1="7" x2="10" y2="12"/></svg>
         </button>
       </div>
@@ -103,39 +103,39 @@
         class="field__textarea field__textarea--readonly"
         rows="4"
         readonly
-        placeholder="транскрипт встречи появится здесь..."
+        placeholder="meeting transcript will appear here..."
       ></textarea>
     </section>
 
-    <!-- Вопрос -->
+    <!-- Question -->
     <section class="card">
-      <button id="btnDictation" class="btn btn--primary" type="button">Спросить у агента</button>
+      <button id="btnDictation" class="btn btn--primary" type="button">Ask the agent</button>
       <div class="textarea-toolbar">
-        <button class="icon-btn" id="copyQuestion" type="button" title="Копировать">
+        <button class="icon-btn" id="copyQuestion" type="button" title="Copy">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="2"/><path d="M11 5V3a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></svg>
         </button>
-        <button class="icon-btn" id="clearQuestion" type="button" title="Очистить">
+        <button class="icon-btn" id="clearQuestion" type="button" title="Clear">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,4 13,4"/><path d="M6 4V2h4v2"/><rect x="4" y="4" width="8" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="12"/><line x1="10" y1="7" x2="10" y2="12"/></svg>
         </button>
       </div>
-      <textarea id="question" class="field__textarea" rows="3" placeholder="Надиктуйте свой вопрос агенту. Вы всегда можете его дополнить вручную."></textarea>
-      <button id="btnSendToAgent" class="btn btn--accent" type="button" disabled>Отправить агенту</button>
+      <textarea id="question" class="field__textarea" rows="3" placeholder="Dictate your question to the agent. You can always edit it manually."></textarea>
+      <button id="btnSendToAgent" class="btn btn--accent" type="button" disabled>Send to agent</button>
     </section>
 
-    <!-- Ответ -->
+    <!-- Answer -->
     <section class="card">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-        <span class="card__title" style="margin-bottom:0;">Ответ</span>
+        <span class="card__title" style="margin-bottom:0;">Answer</span>
         <div class="textarea-toolbar">
-          <button class="icon-btn" id="copyAnswer" type="button" title="Копировать">
+          <button class="icon-btn" id="copyAnswer" type="button" title="Copy">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="2"/><path d="M11 5V3a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></svg>
           </button>
-          <button class="icon-btn" id="clearAnswer" type="button" title="Очистить">
+          <button class="icon-btn" id="clearAnswer" type="button" title="Clear">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,4 13,4"/><path d="M6 4V2h4v2"/><rect x="4" y="4" width="8" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="12"/><line x1="10" y1="7" x2="10" y2="12"/></svg>
           </button>
         </div>
       </div>
-      <div id="answer" class="answer">(пусто)</div>
+      <div id="answer" class="answer">(empty)</div>
     </section>
 
     <script src="popup.js"></script>

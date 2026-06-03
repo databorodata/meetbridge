@@ -228,8 +228,8 @@ func runServe(args []string) int {
 			return 1
 		}
 		if err := whispersetup.Ensure(wr, log.Printf); err != nil {
-			log.Printf("ERROR: подготовка whisper-server: %v", err)
-			log.Printf("Установите Python 3.10+ в PATH или запустите с -skip-whisper-setup (или MEET_BRIDGE_SKIP_WHISPER_SETUP=1).")
+			log.Printf("ERROR: whisper-server setup: %v", err)
+			log.Printf("Install Python 3.10+ in PATH or run with -skip-whisper-setup (or MEET_BRIDGE_SKIP_WHISPER_SETUP=1).")
 			return 1
 		}
 	}

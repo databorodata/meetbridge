@@ -1,11 +1,11 @@
 /**
- * Сервис-воркер: вкладка capture, приём транскрипта, буфер дельт для окна контекста.
+ * Service worker: capture tab, transcript ingestion, delta buffer for context window.
  */
 
 let captureTabId = null;
 let dictationTabId = null;
 
-// Восстановление ID вкладок после перезапуска service worker
+// Restore tab IDs after service worker restart
 (async () => {
   const s = await chrome.storage.local.get(["_captureTabId", "_dictationTabId"]);
   if (s._captureTabId != null) {
@@ -134,7 +134,7 @@ async function ensureCaptureTab() {
     }
   }
 
-  // Закрываем старую зависшую вкладку, если она есть в storage
+  // Close stale tab from storage if present
   const saved = await chrome.storage.local.get("_captureTabId");
   if (saved._captureTabId != null && saved._captureTabId !== captureTabId) {
     chrome.tabs.remove(saved._captureTabId).catch(() => {});
@@ -177,7 +177,7 @@ async function ensureDictationTab() {
     }
   }
 
-  // Закрываем старую зависшую вкладку, если она есть в storage
+  // Close stale tab from storage if present
   const savedD = await chrome.storage.local.get("_dictationTabId");
   if (savedD._dictationTabId != null && savedD._dictationTabId !== dictationTabId) {
     chrome.tabs.remove(savedD._dictationTabId).catch(() => {});
@@ -222,7 +222,7 @@ async function sendToCaptureTab(tabId, message) {
       await new Promise((r) => setTimeout(r, 200));
     }
   }
-  throw new Error(lastErr || "capture tab не отвечает");
+  throw new Error(lastErr || "capture tab not responding");
 }
 
 async function sendToDictationTab(tabId, message) {
@@ -237,12 +237,12 @@ async function sendToDictationTab(tabId, message) {
       await new Promise((r) => setTimeout(r, 200));
     }
   }
-  throw new Error(lastErr || "dictation tab не отвечает");
+  throw new Error(lastErr || "dictation tab not responding");
 }
 
 /**
- * Запуск захвата вкладки встречи (общая логика для popup и возобновления после диктовки).
- * @param {{ preserveTranscript?: boolean }} opts — если true, не очищать буфер транскрипта (возврат после паузы при диктовке).
+ * Start meeting tab capture (shared logic for popup and resume after dictation).
+ * @param {{ preserveTranscript?: boolean }} opts — if true, do not clear transcript buffer (resume after dictation pause).
  */
 async function executeStartCapture(opts = {}) {
   const preserveTranscript = opts.preserveTranscript === true;
@@ -261,7 +261,7 @@ async function executeStartCapture(opts = {}) {
     if (!active?.id) {
       await chrome.storage.local.set({ capturing: false });
       chrome.action.setBadgeText({ text: "" }).catch(() => {});
-      return { ok: false, error: "Нет активной вкладки — выберите вкладку с встречей." };
+      return { ok: false, error: "No active tab — select the meeting tab." };
     }
 
     const meetTabId = active.id;
@@ -368,7 +368,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           "capturing",
         ]);
 
-        const pause = true; // всегда паузим встречу во время диктовки
+        const pause = true; // always pause meeting during dictation
         const wasCapturing = s.capturing === true;
 
         await clearDictationBuffer();

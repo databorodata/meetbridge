@@ -1,6 +1,6 @@
 /**
- * Захват аудио активной вкладки → WebSocket WhisperLive.
- * Адаптировано из Audio-Transcription/options.js (без оверлея на странице).
+ * Capture active tab audio → WhisperLive WebSocket.
+ * Adapted from Audio-Transcription/options.js (without on-page overlay).
  */
 
 let cleanupDone = false;

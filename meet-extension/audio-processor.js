@@ -1,4 +1,4 @@
-// AudioWorklet: чанки PCM для отправки в WhisperLive (как в референсе Audio-Transcription).
+// AudioWorklet: PCM chunks for WhisperLive (same pattern as Audio-Transcription reference).
 class AudioCaptureProcessor extends AudioWorkletProcessor {
   constructor() {
     super();

@@ -1,99 +1,99 @@
 #!/usr/bin/env bash
-# start.sh — запускает meet-bridge и WhisperLive одной командой.
-# Использование: ./start.sh
+# start.sh — starts meet-bridge and WhisperLive with one command.
+# Usage: ./start.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ── загрузка .env ──────────────────────────────────────────────────────────────
+# ── load .env ──────────────────────────────────────────────────────────────
 if [[ -f "$SCRIPT_DIR/.env" ]]; then
   set -a
   # shellcheck source=/dev/null
   source "$SCRIPT_DIR/.env"
   set +a
 else
-  echo "[start] .env не найден. Скопируй шаблон: cp .env.example .env"
-  echo "[start] Используются переменные из окружения (export)."
+  echo "[start] .env not found. Copy the template: cp .env.example .env"
+  echo "[start] Using variables from the environment (export)."
 fi
 
-# ── проверка обязательных переменных ──────────────────────────────────────────
+# ── required variables ──────────────────────────────────────────────────────
 if [[ -z "${CURSOR_API_KEY:-}" ]]; then
-  echo "[start] ОШИБКА: CURSOR_API_KEY не задан. Укажи его в .env."
+  echo "[start] ERROR: CURSOR_API_KEY is not set. Add it to .env."
   exit 1
 fi
 if [[ -z "${MEET_BRIDGE_REPO:-}" ]]; then
-  echo "[start] ОШИБКА: MEET_BRIDGE_REPO не задан. Укажи абсолютный путь к репозиторию в .env."
+  echo "[start] ERROR: MEET_BRIDGE_REPO is not set. Add the absolute path to your repository in .env."
   exit 1
 fi
 if [[ -z "${GITHUB_TOKEN:-}" ]]; then
-  echo "[start] ПРЕДУПРЕЖДЕНИЕ: GITHUB_TOKEN не задан — агент не сможет читать GitHub issues/PR."
+  echo "[start] WARNING: GITHUB_TOKEN is not set — the agent cannot read GitHub issues/PRs."
 fi
 
-# ── проверка зависимостей ──────────────────────────────────────────────────────
+# ── dependency checks ──────────────────────────────────────────────────────
 if ! command -v agent &>/dev/null; then
-  echo "[start] ОШИБКА: 'agent' не найден в PATH."
-  echo "        Установи Cursor CLI: curl https://cursor.com/install -fsSL | bash"
-  echo "        Затем добавь в ~/.zshrc: export PATH=\"\$HOME/.local/bin:\$PATH\""
+  echo "[start] ERROR: 'agent' not found in PATH."
+  echo "        Install Cursor CLI: curl https://cursor.com/install -fsSL | bash"
+  echo "        Then add to ~/.zshrc: export PATH=\"\$HOME/.local/bin:\$PATH\""
   exit 1
 fi
 if ! command -v go &>/dev/null; then
-  echo "[start] ОШИБКА: 'go' не найден в PATH. Установи Go: https://go.dev/dl/"
+  echo "[start] ERROR: 'go' not found in PATH. Install Go: https://go.dev/dl/"
   exit 1
 fi
 
-# ── сборка моста (если бинарь отсутствует) ────────────────────────────────────
+# ── build bridge (if binary is missing) ────────────────────────────────────
 BRIDGE_BIN="$SCRIPT_DIR/bridge/meet-bridge"
 if [[ ! -f "$BRIDGE_BIN" ]]; then
-  echo "[start] Собираю meet-bridge..."
+  echo "[start] Building meet-bridge..."
   (cd "$SCRIPT_DIR/bridge" && go build -o meet-bridge ./cmd/meet-bridge)
-  echo "[start] meet-bridge собран."
+  echo "[start] meet-bridge built."
 fi
 
-# ── остановка всех процессов при выходе ───────────────────────────────────────
+# ── stop all processes on exit ───────────────────────────────────────────────
 PIDS=()
 cleanup() {
   echo ""
-  echo "[start] Останавливаю процессы..."
+  echo "[start] Stopping processes..."
   for pid in "${PIDS[@]:-}"; do
     kill "$pid" 2>/dev/null || true
   done
   wait 2>/dev/null || true
-  echo "[start] Готово."
+  echo "[start] Done."
 }
 trap cleanup EXIT INT TERM
 
-# ── запуск meet-bridge serve ──────────────────────────────────────────────────
-# Мост при старте сам создаёт whisper-server/.venv и ставит зависимости (первый запуск ~2-5 мин).
-# Сервер начинает слушать порт 7337 только после завершения setup.
-echo "[start] Запускаю meet-bridge (порт 7337)..."
-echo "[start] При первом запуске установка WhisperLive займёт несколько минут — это нормально."
+# ── start meet-bridge serve ──────────────────────────────────────────────────
+# On first start the bridge creates whisper-server/.venv and installs deps (~2-5 min).
+# Port 7337 opens only after setup completes.
+echo "[start] Starting meet-bridge (port 7337)..."
+echo "[start] First run: WhisperLive setup may take a few minutes — this is normal."
 "$BRIDGE_BIN" serve -repo "$MEET_BRIDGE_REPO" &
 BRIDGE_PID=$!
 PIDS+=("$BRIDGE_PID")
 
-# ── ожидание готовности моста (макс. 10 мин) ─────────────────────────────────
-echo "[start] Жду пока meet-bridge поднимется на порту 7337..."
+# ── wait for bridge readiness (max 10 min) ─────────────────────────────────
+echo "[start] Waiting for meet-bridge on port 7337..."
 for i in $(seq 1 600); do
   if ! kill -0 "$BRIDGE_PID" 2>/dev/null; then
-    echo "[start] ОШИБКА: meet-bridge упал при старте. Проверь логи выше."
+    echo "[start] ERROR: meet-bridge exited during startup. Check the logs above."
     exit 1
   fi
   if nc -z 127.0.0.1 7337 2>/dev/null; then
-    echo "[start] meet-bridge готов (${i}s)."
+    echo "[start] meet-bridge ready (${i}s)."
     break
   fi
   if [[ $i -eq 600 ]]; then
-    echo "[start] ОШИБКА: meet-bridge не поднялся за 10 минут."
+    echo "[start] ERROR: meet-bridge did not start within 10 minutes."
     exit 1
   fi
   sleep 1
 done
 
-# ── запуск WhisperLive ────────────────────────────────────────────────────────
+# ── start WhisperLive ────────────────────────────────────────────────────────
 WHISPER_DIR="$SCRIPT_DIR/whisper-server"
 WHISPER_PYTHON="$WHISPER_DIR/.venv/bin/python3"
 
-echo "[start] Запускаю WhisperLive (порт 9090)..."
+echo "[start] Starting WhisperLive (port 9090)..."
 "$WHISPER_PYTHON" "$WHISPER_DIR/run_server.py" \
   --host 127.0.0.1 \
   --port 9090 \
@@ -105,36 +105,36 @@ echo "[start] Запускаю WhisperLive (порт 9090)..."
 WHISPER_PID=$!
 PIDS+=("$WHISPER_PID")
 
-# ── ожидание готовности WhisperLive (макс. 60 сек) ───────────────────────────
-echo "[start] Жду WhisperLive на порту 9090..."
+# ── wait for WhisperLive readiness (max 60 sec) ──────────────────────────────
+echo "[start] Waiting for WhisperLive on port 9090..."
 for i in $(seq 1 60); do
   if ! kill -0 "$WHISPER_PID" 2>/dev/null; then
-    echo "[start] ОШИБКА: WhisperLive упал при старте. Проверь логи выше."
+    echo "[start] ERROR: WhisperLive exited during startup. Check the logs above."
     exit 1
   fi
   if nc -z 127.0.0.1 9090 2>/dev/null; then
-    echo "[start] WhisperLive готов (${i}s)."
+    echo "[start] WhisperLive ready (${i}s)."
     break
   fi
   if [[ $i -eq 60 ]]; then
-    echo "[start] ОШИБКА: WhisperLive не поднялся за 60 секунд."
+    echo "[start] ERROR: WhisperLive did not start within 60 seconds."
     exit 1
   fi
   sleep 1
 done
 
-# ── всё готово ────────────────────────────────────────────────────────────────
+# ── ready ────────────────────────────────────────────────────────────────
 echo ""
 echo "════════════════════════════════════════════════════════════"
-echo "  meet_assist запущен"
-echo "  Мост:        http://127.0.0.1:7337"
+echo "  meet_assist is running"
+echo "  Bridge:      http://127.0.0.1:7337"
 echo "  WhisperLive: ws://127.0.0.1:9090"
-echo "  Репозиторий: $MEET_BRIDGE_REPO"
+echo "  Repository:  $MEET_BRIDGE_REPO"
 echo ""
-echo "  Открой Chrome → вкладку с встречей → расширение MeetBridge"
-echo "  → укажи путь к репозиторию в Настройках → «Начать работу»"
+echo "  Open Chrome → meeting tab → MeetBridge extension"
+echo "  → set repository path in Settings → start listening"
 echo ""
-echo "  Остановить: Ctrl+C"
+echo "  Stop: Ctrl+C"
 echo "════════════════════════════════════════════════════════════"
 
 wait

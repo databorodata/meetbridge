@@ -1,8 +1,9 @@
-/** Локальные URL моста и WhisperLive (не показываются в UI). */
+/** Local bridge and WhisperLive URLs (not shown in UI). */
 const BRIDGE_BASE_URL = "http://127.0.0.1:7337";
 const WHISPER_WS_URL = "ws://127.0.0.1:9090";
 
 const WORK_LOG_PREFIX = "[meet-bridge:work]";
+const EMPTY_LABEL = "(empty)";
 
 const DEFAULTS = {
   repoPath: "",
@@ -91,32 +92,32 @@ async function loadState() {
   $("model").value = state.model || "auto";
   $("modelCustom").value = state.modelCustom || "";
   
-  // Показать/скрыть custom model input
+  // Show/hide custom model input
   const isCustom = $("model").value === "custom";
   $("modelCustom").classList.toggle("field__input--hidden", !isCustom);
 
-  const { dictationDraftText = "", questionDraftText = "", lastAnswer = "(пусто)" } = await chrome.storage.local.get([
+  const { dictationDraftText = "", questionDraftText = "", lastAnswer = EMPTY_LABEL } = await chrome.storage.local.get([
     "dictationDraftText",
     "questionDraftText",
     "lastAnswer",
   ]);
   $("question").value = questionDraftText || dictationDraftText || "";
-  $("answer").textContent = lastAnswer;
+  $("answer").textContent = lastAnswer === "(пусто)" ? EMPTY_LABEL : lastAnswer;
 
   await refreshMeetingContextFromTranscript();
 
   updateSendButtonState();
 
-  // Восстановить состояние кнопок
+  // Restore button state
   const { capturing = false, dictating = false } = await chrome.storage.local.get(["capturing", "dictating"]);
   isCapturing = capturing;
   isDictating = dictating;
   if (isCapturing) {
-    $("btnCapture").textContent = "Перестать слушать";
+    $("btnCapture").textContent = "Stop listening";
     $("btnCapture").classList.add("btn--active");
   }
   if (isDictating) {
-    $("btnDictation").textContent = "Остановить запись вопроса";
+    $("btnDictation").textContent = "Stop recording question";
     $("btnDictation").classList.add("btn--active");
   }
 
@@ -201,21 +202,21 @@ function setupAutosaveSettings() {
 
 async function onToggleCapture() {
   if (isCapturing) {
-    // Остановить захват (НЕ очищать транскрипт!)
+    // Stop capture (do NOT clear transcript!)
     const res = await chrome.runtime.sendMessage({ type: "STOP_CAPTURE" });
     if (res?.ok) {
       isCapturing = false;
       await saveState({ capturing: false });
-      $("btnCapture").textContent = "Слушать встречу";
+      $("btnCapture").textContent = "Listen to meeting";
       $("btnCapture").classList.remove("btn--active");
-      setStatus("ok", "пауза");
+      setStatus("ok", "paused");
     }
   } else {
-    // Сначала health + session (как в старом onStartWork), потом capture
-    setStatus("idle", "подключение…");
+    // Health + session first, then capture
+    setStatus("idle", "connecting…");
     const repoPath = $("repoPath").value.trim();
     if (!repoPath) {
-      setStatus("bad", "укажите repo в настройках");
+      setStatus("bad", "set repo in Settings");
       return;
     }
     await persistWhisperSettingsForCapture();
@@ -225,8 +226,8 @@ async function onToggleCapture() {
       const h = await httpGET("/health");
       if (h.status !== 200 || !h.json?.ok) {
         workLog("health_fail", `status=${h.status} ok=${h.json?.ok}`);
-        setStatus("bad", "мост недоступен");
-        $("answer").textContent = "meet-bridge не запущен. Запустите ./start.sh";
+        setStatus("bad", "bridge unavailable");
+        $("answer").textContent = "meet-bridge is not running. Run ./start.sh";
         return;
       }
       workLog("health_ok", `v=${h.json?.version ?? "?"}`);
@@ -246,7 +247,7 @@ async function onToggleCapture() {
       });
       if (status !== 200 || !json?.ok) {
         workLog("session_fail", `status=${status}`);
-        setStatus("bad", "сессия не создана");
+        setStatus("bad", "session not created");
         $("answer").textContent = pretty(json);
         return;
       }
@@ -257,19 +258,19 @@ async function onToggleCapture() {
       const cap = await chrome.runtime.sendMessage({ type: "START_CAPTURE", preserveTranscript: true });
       if (!cap?.ok) {
         workLog("capture_fail", cap?.error || "unknown");
-        setStatus("bad", cap?.error || "захват не запущен");
+        setStatus("bad", cap?.error || "capture failed to start");
         return;
       }
       workLog("capture_ok", "ok");
       isCapturing = true;
-      // captureWasPaused сбрасываем: это новый старт (не возобновление)
+      // Reset captureWasPaused: this is a fresh start (not a resume)
       await saveState({ capturing: true, captureWasPaused: false });
-      $("btnCapture").textContent = "Перестать слушать";
+      $("btnCapture").textContent = "Stop listening";
       $("btnCapture").classList.add("btn--active");
-      setStatus("ok", "слушаю встречу");
+      setStatus("ok", "listening to meeting");
     } catch (e) {
       workLog("error", String(e?.message || e));
-      setStatus("bad", "ошибка");
+      setStatus("bad", "error");
       $("answer").textContent = String(e?.message || e);
     }
   }
@@ -277,15 +278,15 @@ async function onToggleCapture() {
 
 async function stopDictation() {
   if (!isDictating) return false;
-  // Шлём stop, но сбрасываем UI и состояние независимо от ответа:
-  // background может вернуть ok:false если вкладка диктовки уже закрылась,
-  // но аудио-запись всё равно прекратилась и текст есть в storage.
+  // Send stop, but reset UI and state regardless of response:
+  // background may return ok:false if the dictation tab already closed,
+  // but audio recording still stopped and text is in storage.
   await chrome.runtime.sendMessage({ type: "STOP_DICTATION" }).catch(() => {});
   isDictating = false;
   await saveState({ dictating: false });
-  $("btnDictation").textContent = "Спросить у агента";
+  $("btnDictation").textContent = "Ask the agent";
   $("btnDictation").classList.remove("btn--active");
-  // Пауза чтобы последний чанк успел записаться в storage
+  // Brief pause so the last chunk can be written to storage
   await new Promise((r) => setTimeout(r, 400));
   const { dictationDraftText = "" } = await chrome.storage.local.get("dictationDraftText");
   if (dictationDraftText) {
@@ -299,18 +300,18 @@ async function stopDictation() {
 async function onToggleDictation() {
   if (isDictating) {
     const stopped = await stopDictation();
-    if (stopped) setStatus("ok", "вопрос записан");
+    if (stopped) setStatus("ok", "question recorded");
   } else {
     await persistWhisperSettingsForCapture();
     const res = await chrome.runtime.sendMessage({ type: "START_DICTATION" });
     if (res?.ok) {
       isDictating = true;
       await saveState({ dictating: true });
-      $("btnDictation").textContent = "Остановить запись вопроса";
+      $("btnDictation").textContent = "Stop recording question";
       $("btnDictation").classList.add("btn--active");
-      setStatus("ok", "диктовка…");
+      setStatus("ok", "dictating…");
     } else {
-      setStatus("bad", res?.error || "ошибка");
+      setStatus("bad", res?.error || "error");
     }
   }
 }
@@ -320,25 +321,25 @@ async function onSendToAgent() {
     await stopDictation();
   }
 
-  // Блокируем кнопку на время запроса — предотвращает дубли
+  // Disable button while request is in flight — prevents duplicates
   const sendBtn = $("btnSendToAgent");
   sendBtn.disabled = true;
-  sendBtn.textContent = "Жду ответа…";
+  sendBtn.textContent = "Waiting for answer…";
 
-  setStatus("idle", "отправляем…");
+  setStatus("idle", "sending…");
   const state = await getBridgeState();
   const sessionId = state.sessionId;
   const question = $("question").value.trim();
   if (!question) {
-    setStatus("bad", "вопрос пуст");
-    sendBtn.textContent = "Отправить агенту";
+    setStatus("bad", "question is empty");
+    sendBtn.textContent = "Send to agent";
     updateSendButtonState();
     return;
   }
   if (!sessionId) {
-    setStatus("bad", "нет session_id");
-    $("answer").textContent = "Сначала нажмите «Слушать встречу» (создаётся сессия).";
-    sendBtn.textContent = "Отправить агенту";
+    setStatus("bad", "no session_id");
+    $("answer").textContent = 'Click "Listen to meeting" first (creates a session).';
+    sendBtn.textContent = "Send to agent";
     updateSendButtonState();
     return;
   }
@@ -362,21 +363,21 @@ async function onSendToAgent() {
       options: { model, timeout_seconds: 600 },
     });
     if (!json?.ok) {
-      setStatus("bad", "agent: ошибка");
+      setStatus("bad", "agent: error");
       $("answer").textContent = pretty(json);
       return;
     }
-    setStatus("ok", "готово");
-    const answerText = json.agent?.stdout || "(пусто)";
+    setStatus("ok", "ready");
+    const answerText = json.agent?.stdout || EMPTY_LABEL;
     $("answer").textContent = answerText;
     await chrome.storage.local.set({ lastAnswer: answerText, reminderDismissed: false });
-    // Показываем reminder снова — напомнить, что можно менять repo при следующем вопросе
+    // Show reminder again — user can change repo before the next question
     $("reminder").style.display = "";
   } catch (e) {
-    setStatus("bad", "ошибка");
+    setStatus("bad", "error");
     $("answer").textContent = String(e?.message || e);
   } finally {
-    sendBtn.textContent = "Отправить агенту";
+    sendBtn.textContent = "Send to agent";
     updateSendButtonState();
   }
 }
@@ -416,7 +417,7 @@ function setupStorageSync() {
 
 async function main() {
   await loadState();
-  setStatus("idle", "готово");
+  setStatus("idle", "ready");
 
   $("btnCapture").addEventListener("click", onToggleCapture);
   $("btnDictation").addEventListener("click", onToggleDictation);
@@ -449,13 +450,13 @@ async function main() {
   });
 
   $("clearAnswer").addEventListener("click", async () => {
-    $("answer").textContent = "(пусто)";
-    await chrome.storage.local.set({ lastAnswer: "(пусто)" });
+    $("answer").textContent = EMPTY_LABEL;
+    await chrome.storage.local.set({ lastAnswer: EMPTY_LABEL });
   });
 
   $("copyAnswer").addEventListener("click", () => {
     const text = $("answer").textContent.trim();
-    if (text && text !== "(пусто)") navigator.clipboard.writeText(text).catch(() => {});
+    if (text && text !== EMPTY_LABEL) navigator.clipboard.writeText(text).catch(() => {});
   });
 
   $("question").addEventListener("input", () => {
@@ -480,9 +481,9 @@ async function main() {
   });
 
   $("btnReset").addEventListener("click", async () => {
-    if (!confirm("Сбросить всё? Транскрипт, вопрос и ответ будут очищены.")) return;
+    if (!confirm("Reset everything? Transcript, question, and answer will be cleared.")) return;
 
-    // Остановить всё активное
+    // Stop all active processes
     if (isCapturing) {
       await chrome.runtime.sendMessage({ type: "STOP_CAPTURE" }).catch(() => {});
       isCapturing = false;
@@ -492,7 +493,7 @@ async function main() {
       isDictating = false;
     }
 
-    // Очистить storage
+    // Clear storage
     await chrome.storage.local.set({
       meetTranscriptDeltas: [],
       meetTranscriptPrev: "",
@@ -500,7 +501,7 @@ async function main() {
       dictationTranscriptDeltas: [],
       dictationTranscriptPrev: "",
       questionDraftText: "",
-      lastAnswer: "(пусто)",
+      lastAnswer: EMPTY_LABEL,
       capturing: false,
       dictating: false,
       captureWasPaused: false,
@@ -508,17 +509,17 @@ async function main() {
       sessionId: "",
     });
 
-    // Сбросить UI
+    // Reset UI
     $("meetingContext").value = "";
     $("question").value = "";
-    $("answer").textContent = "(пусто)";
-    $("btnCapture").textContent = "Слушать встречу";
+    $("answer").textContent = EMPTY_LABEL;
+    $("btnCapture").textContent = "Listen to meeting";
     $("btnCapture").classList.remove("btn--active");
-    $("btnDictation").textContent = "Спросить у агента";
+    $("btnDictation").textContent = "Ask the agent";
     $("btnDictation").classList.remove("btn--active");
     $("reminder").style.display = "";
     updateSendButtonState();
-    setStatus("idle", "готово");
+    setStatus("idle", "ready");
   });
 
   setupAutosaveSettings();
@@ -526,6 +527,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  setStatus("bad", "ошибка");
+  setStatus("bad", "error");
   $("answer").textContent = String(e?.message || e);
 });

@@ -101,7 +101,7 @@ func FindSystemPython() (string, error) {
 			return path, nil
 		}
 	}
-	return "", fmt.Errorf("нужен Python 3.10+ в PATH (например: brew install python@3.11)")
+	return "", fmt.Errorf("Python 3.10+ required in PATH (e.g. brew install python@3.11)")
 }
 
 func runImportCheck(py string) error {
@@ -118,23 +118,23 @@ func runImportCheck(py string) error {
 func Ensure(whisperRoot string, logf func(string, ...any)) error {
 	req := filepath.Join(whisperRoot, "requirements.txt")
 	if st, err := os.Stat(req); err != nil || st.IsDir() {
-		return fmt.Errorf("нет %s — ожидается каталог whisper-server в репозитории", req)
+		return fmt.Errorf("missing %s — expected whisper-server directory in repository", req)
 	}
 
 	vp := venvPython(whisperRoot)
 	if _, err := os.Stat(vp); err == nil {
 		if err := runImportCheck(vp); err == nil {
-			logf("meet-bridge: WhisperLive venv уже готов: %s", vp)
+			logf("meet-bridge: WhisperLive venv already ready: %s", vp)
 			return nil
 		}
-		logf("meet-bridge: venv есть, но импорт whisper_live не удался — переустановка: %v", err)
+		logf("meet-bridge: venv exists but whisper_live import failed — reinstalling: %v", err)
 	}
 
 	py, err := FindSystemPython()
 	if err != nil {
 		return err
 	}
-	logf("meet-bridge: создаём venv в %s (интерпретатор: %s)", whisperRoot, py)
+	logf("meet-bridge: creating venv in %s (interpreter: %s)", whisperRoot, py)
 
 	cmd := exec.Command(py, "-m", "venv", ".venv")
 	cmd.Dir = whisperRoot
@@ -160,8 +160,8 @@ func Ensure(whisperRoot string, logf func(string, ...any)) error {
 
 	vp = venvPython(whisperRoot)
 	if err := runImportCheck(vp); err != nil {
-		return fmt.Errorf("проверка import whisper_live: %w", err)
+		return fmt.Errorf("whisper_live import check: %w", err)
 	}
-	logf("meet-bridge: WhisperLive зависимости установлены (%s)", vp)
+	logf("meet-bridge: WhisperLive dependencies installed (%s)", vp)
 	return nil
 }

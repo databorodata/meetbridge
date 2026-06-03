@@ -1,6 +1,6 @@
 /**
- * Диктовка вопроса (микрофон) → отдельный WebSocket WhisperLive.
- * По паттерну `capture.js`, но источник аудио: getUserMedia({audio:true}).
+ * Question dictation (microphone) → separate WhisperLive WebSocket.
+ * Same pattern as `capture.js`, but audio source is getUserMedia({audio:true}).
  */
 
 let cleanupDone = false;
