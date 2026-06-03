@@ -21,12 +21,16 @@ if [[ -z "${CURSOR_API_KEY:-}" ]]; then
   echo "[start] ERROR: CURSOR_API_KEY is not set. Add it to .env."
   exit 1
 fi
-if [[ -z "${MEET_BRIDGE_REPO:-}" ]]; then
-  echo "[start] ERROR: MEET_BRIDGE_REPO is not set. Add the absolute path to your repository in .env."
-  exit 1
-fi
 if [[ -z "${GITHUB_TOKEN:-}" ]]; then
   echo "[start] WARNING: GITHUB_TOKEN is not set — the agent cannot read GitHub issues/PRs."
+fi
+
+# ── cli-config.json check ─────────────────────────────────────────────────
+if [[ ! -f "$HOME/.cursor/cli-config.json" ]]; then
+  echo "[start] WARNING: ~/.cursor/cli-config.json not found."
+  echo "        The agent may fail without Cursor CLI configuration."
+  echo "        Copy it from your Cursor app: Cursor → Settings → Advanced → CLI"
+  echo "        Or manually create it with your API key."
 fi
 
 # ── dependency checks ──────────────────────────────────────────────────────
@@ -67,7 +71,7 @@ trap cleanup EXIT INT TERM
 # Port 7337 opens only after setup completes.
 echo "[start] Starting meet-bridge (port 7337)..."
 echo "[start] First run: WhisperLive setup may take a few minutes — this is normal."
-"$BRIDGE_BIN" serve -repo "$MEET_BRIDGE_REPO" &
+"$BRIDGE_BIN" serve &
 BRIDGE_PID=$!
 PIDS+=("$BRIDGE_PID")
 
@@ -126,10 +130,9 @@ done
 # ── ready ────────────────────────────────────────────────────────────────
 echo ""
 echo "════════════════════════════════════════════════════════════"
-echo "  meet_assist is running"
+echo "  MeetBridge is running"
 echo "  Bridge:      http://127.0.0.1:7337"
 echo "  WhisperLive: ws://127.0.0.1:9090"
-echo "  Repository:  $MEET_BRIDGE_REPO"
 echo ""
 echo "  Open Chrome → meeting tab → MeetBridge extension"
 echo "  → set repository path in Settings → start listening"

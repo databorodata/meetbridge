@@ -1,4 +1,12 @@
-/** Local bridge and WhisperLive URLs (not shown in UI). */
+/**
+ * Local bridge and WhisperLive URLs (not shown in UI).
+ * 
+ * IMPORTANT: These URLs must match the ports used by:
+ * - BRIDGE_BASE_URL: meet-bridge server (default: 7337, see start.sh)
+ * - WHISPER_WS_URL: WhisperLive WebSocket (default: 9090, see start.sh)
+ * 
+ * If you change ports in start.sh, update these constants accordingly.
+ */
 const BRIDGE_BASE_URL = "http://127.0.0.1:7337";
 const WHISPER_WS_URL = "ws://127.0.0.1:9090";
 

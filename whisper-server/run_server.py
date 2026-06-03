@@ -31,6 +31,8 @@ _PFX_DISCO  = "↩  "
 _DISCONNECT_PHRASES = (
     "1000 (ok)", "1001 (going away)",
     "client disconnected", "received 1000", "sent 1000",
+    "handshake failed", "did not receive a valid http request",
+    "stream ends after 0 bytes",
 )
 
 
@@ -90,7 +92,8 @@ class ColorFormatter(logging.Formatter):
             f"{color}{prefix}{bold}{label}{_R}"
             f"  {color}{record.message}{_R}"
         )
-        if record.exc_text:
+        # Skip traceback for normal disconnects
+        if record.exc_text and not (record.levelno >= logging.ERROR and _is_normal_disconnect(record)):
             line += f"\n{_C_ERR}{record.exc_text}{_R}"
         return line
 

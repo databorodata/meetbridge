@@ -17,8 +17,8 @@ import (
 	"sync"
 	"time"
 
-	"meet_assist/bridge/internal/agentrun"
-	"meet_assist/bridge/internal/whispersetup"
+	"meetbridge/bridge/internal/agentrun"
+	"meetbridge/bridge/internal/whispersetup"
 )
 
 // bridgeVersion is returned by GET /health (MVP).

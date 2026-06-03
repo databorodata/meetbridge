@@ -1,3 +1,3 @@
-module meet_assist/bridge
+module meetbridge/bridge
 
 go 1.22

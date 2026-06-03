@@ -36,6 +36,7 @@ build/
 .cache/
 
 # ─── Go build artifacts ───────────────────────────────────────────────────────
+# Compiled Go binary (built automatically by start.sh)
 bridge/meet-bridge
 
 # ─── Рабочие заметки и референсные проекты ───────────────────────────────────
