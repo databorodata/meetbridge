@@ -1,4 +1,4 @@
-# ─── Секреты и конфигурация пользователя ─────────────────────────────────────
+# ─── Secrets and user configuration ─────────────────────────────────────────
 .env
 .env.*
 *.pem
@@ -30,7 +30,7 @@ node_modules/
 dist/
 build/
 
-# ─── Логи и временные файлы ───────────────────────────────────────────────────
+# ─── Logs and temporary files ─────────────────────────────────────────────────
 *.log
 .tmp/
 .cache/
@@ -38,3 +38,7 @@ build/
 # ─── Go build artifacts ───────────────────────────────────────────────────────
 # Compiled Go binary (built automatically by start.sh)
 bridge/meet-bridge
+
+# ─── Working notes ──────────────────────────────────────────────────────────────
+help/
+public.md
