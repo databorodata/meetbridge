@@ -53,7 +53,7 @@ Uses `chrome.tabCapture` API and offscreen documents, which are Chrome-specific.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/meetbridge.git
+git clone https://github.com/databorodata/meetbridge.git
 cd meetbridge
 ```
 
@@ -85,13 +85,22 @@ GITHUB_TOKEN=your_token_here
 
 ⚠️ **Security:** With a read-only token, the agent cannot push code or comment on PRs. Write operations will fail with HTTP 403.
 
-### 3. Copy Cursor CLI config
+### 3. Copy Cursor CLI permissions file
 
-The bridge needs `~/.cursor/cli-config.json` to authenticate agents.
+After cloning, you already have `cli-config.json` in the project folder (same level as this README).
 
-**Find it in Cursor:**
-- macOS: `Cursor → Settings → Advanced → CLI`
-- Copy the config file to `~/.cursor/cli-config.json`
+Copy it to your home directory:
+
+```bash
+cp cli-config.json ~/.cursor/cli-config.json
+```
+
+| Question | Answer |
+|----------|--------|
+| Where is the file? | In the repo root: `cli-config.json` |
+| What does it do? | Tells Cursor CLI what the agent may do (read-only workspace + `gh`) |
+| Is this my API key? | **No.** The API key is only in `.env` (`CURSOR_API_KEY`, step 2) |
+| What if I skip this? | `./start.sh` warns; the agent may ask for permissions or refuse some actions |
 
 ### 4. Start the servers
 
