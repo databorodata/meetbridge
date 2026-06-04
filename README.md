@@ -57,7 +57,33 @@ git clone https://github.com/databorodata/meetbridge.git
 cd meetbridge
 ```
 
-### 2. Configure environment
+### 2. Install Cursor CLI (`agent`)
+
+MeetBridge runs the **`agent`** command from [Cursor CLI](https://cursor.com/docs/cli/overview). This is checked when you run `./start.sh` — **before** the Chrome extension or repository path in Settings matter.
+
+Install the CLI:
+
+```bash
+curl https://cursor.com/install -fsSL | bash
+```
+
+Add it to your PATH (installer usually puts the binary in `~/.local/bin`):
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Verify (must print a path, not “not found”):
+
+```bash
+which agent
+agent --version
+```
+
+If `which agent` fails, open a **new** terminal window after `source ~/.zshrc`, or run `export PATH="$HOME/.local/bin:$PATH"` in the current session, then try again.
+
+### 3. Configure environment
 
 ```bash
 cp .env.example .env
@@ -85,7 +111,7 @@ GITHUB_TOKEN=your_token_here
 
 ⚠️ **Security:** With a read-only token, the agent cannot push code or comment on PRs. Write operations will fail with HTTP 403.
 
-### 3. Copy Cursor CLI permissions file
+### 4. Copy Cursor CLI permissions file
 
 After cloning, you already have `cli-config.json` in the project folder (same level as this README).
 
@@ -99,10 +125,10 @@ cp cli-config.json ~/.cursor/cli-config.json
 |----------|--------|
 | Where is the file? | In the repo root: `cli-config.json` |
 | What does it do? | Tells Cursor CLI what the agent may do (read-only workspace + `gh`) |
-| Is this my API key? | **No.** The API key is only in `.env` (`CURSOR_API_KEY`, step 2) |
+| Is this my API key? | **No.** The API key is only in `.env` (`CURSOR_API_KEY`, step 3) |
 | What if I skip this? | `./start.sh` warns; the agent may ask for permissions or refuse some actions |
 
-### 4. Start the servers
+### 5. Start the servers
 
 ```bash
 ./start.sh
@@ -127,7 +153,7 @@ You'll see:
 ════════════════════════════════════════════════════════════
 ```
 
-### 5. Load the Chrome extension
+### 6. Load the Chrome extension
 
 1. Open Chrome and go to `chrome://extensions`
 2. Enable **Developer mode** (top-right toggle)
@@ -205,13 +231,10 @@ On first model load, faster-whisper downloads it to `~/.cache/huggingface/`.
 
 ## Troubleshooting
 
-**"agent not found in PATH"**  
-Install Cursor CLI:
-```bash
-curl https://cursor.com/install -fsSL | bash
-# Add to ~/.zshrc:
-export PATH="$HOME/.local/bin:$PATH"
-```
+**`[start] ERROR: 'agent' not found in PATH`**  
+This comes from `./start.sh` in your terminal. It is **not** caused by the Chrome extension or by the repository path in MeetBridge Settings.
+
+Fix: complete **Installation → step 2** (install Cursor CLI, add `~/.local/bin` to PATH, run `which agent`). Then run `./start.sh` again in a **new** terminal tab if needed.
 
 **"bridge unavailable" in extension**  
 Check `./start.sh` logs. Common causes:
