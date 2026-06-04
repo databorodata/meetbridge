@@ -39,6 +39,10 @@ Bridge between your online meeting and Cursor AI: real-time transcript + ask the
 - **Cursor CLI** with API key ([get it here](https://cursor.com/dashboard/integrations))
 - **Go 1.22+** ([download](https://go.dev/dl/))
 - **Python 3.10+** (recommend 3.11 via Homebrew: `brew install python@3.11`)
+- **macOS (Homebrew):** FFmpeg + pkg-config — required to build WhisperLive’s Python dependency `av` on first `./start.sh`:
+  ```bash
+  brew install ffmpeg pkg-config
+  ```
 
 **Optional:**
 - **GitHub CLI** (`gh`) for reading issues/PRs — requires fine-grained PAT with read-only permissions
@@ -130,11 +134,13 @@ cp cli-config.json ~/.cursor/cli-config.json
 
 ### 5. Start the servers
 
+On **macOS**, install FFmpeg **before** the first run (see Requirements). Without it, `pip` may fail while building the `av` package.
+
 ```bash
 ./start.sh
 ```
 
-**First run:** Installs WhisperLive dependencies (~3-5 GB) and downloads the Whisper model (~466 MB for `small`). This takes **5-10 minutes**.
+**First run:** Creates `whisper-server/.venv`, installs WhisperLive dependencies (~3-5 GB), and downloads the Whisper model (~466 MB for `small`). This takes **5-10 minutes**. Do not close the terminal until you see the “MeetBridge is running” banner.
 
 **Subsequent runs:** ~5 seconds startup.
 
@@ -248,12 +254,28 @@ brew install python@3.11
 # Restart terminal, then ./start.sh
 ```
 
-**WhisperLive import errors**  
+**`Failed to build 'av'` / `Package 'libavformat' not found` / `whisper-server setup` failed**  
+On macOS, WhisperLive’s installer builds the `av` (PyAV) package, which needs FFmpeg libraries via `pkg-config`.
+
+```bash
+brew install ffmpeg pkg-config
+cd meetbridge   # your clone directory
+rm -rf whisper-server/.venv
+export PKG_CONFIG_PATH="$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH"
+./start.sh
+```
+
+This is a **terminal / Python setup** issue, not the Chrome extension or repository path in Settings.
+
+**WhisperLive import errors** (after a successful install)  
 Delete `.venv` and reinstall:
 ```bash
 rm -rf whisper-server/.venv
 ./start.sh
 ```
+
+**`meet-bridge exited during startup` right after pip errors**  
+Fix the pip/FFmpeg problem above first, remove the broken venv (`rm -rf whisper-server/.venv`), then run `./start.sh` again.
 
 ---
 
