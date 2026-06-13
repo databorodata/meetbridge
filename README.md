@@ -41,9 +41,9 @@ Bridge between your online meeting and Cursor AI: real-time transcript + ask the
 - **Cursor CLI** with API key ([get it here](https://cursor.com/dashboard/integrations))
 - **Go 1.22+** ([download](https://go.dev/dl/))
 - **Python 3.10+** (recommend 3.11 via Homebrew: `brew install python@3.11`)
-- **macOS (Homebrew):** FFmpeg + pkg-config — required to build WhisperLive’s Python dependency `av` on first `./start.sh`:
+- **macOS (Homebrew):** native libraries for WhisperLive on first `./start.sh` (`av`, `PyAudio`):
   ```bash
-  brew install ffmpeg pkg-config
+  brew install ffmpeg pkg-config portaudio
   ```
 
 **Optional:**
@@ -136,11 +136,14 @@ cp cli-config.json ~/.cursor/cli-config.json
 
 ### 5. Start the servers
 
-On **macOS**, install FFmpeg **before** the first run (see Requirements). Without it, `pip` may fail while building the `av` package.
+On **macOS**, install the Homebrew packages from **Requirements** before the first run. Then:
 
 ```bash
+export PKG_CONFIG_PATH="$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH"
 ./start.sh
 ```
+
+Without `ffmpeg`, `pkg-config`, or `portaudio`, `pip` may fail building `av` or `PyAudio`.
 
 **First run:** Creates `whisper-server/.venv`, installs WhisperLive dependencies (~3-5 GB), and downloads the Whisper model (~466 MB for `small`). This takes **5-10 minutes**. Do not close the terminal until you see the “MeetBridge is running” banner.
 
@@ -257,13 +260,22 @@ brew install python@3.11
 ```
 
 **`Failed to build 'av'` / `Package 'libavformat' not found` / `whisper-server setup` failed**  
-On macOS, WhisperLive’s installer builds the `av` (PyAV) package, which needs FFmpeg libraries via `pkg-config`.
+On macOS, WhisperLive builds `av` (PyAV), which needs FFmpeg via `pkg-config`.
 
 ```bash
-brew install ffmpeg pkg-config
+brew install ffmpeg pkg-config portaudio
 cd meetbridge   # your clone directory
 rm -rf whisper-server/.venv
 export PKG_CONFIG_PATH="$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH"
+./start.sh
+```
+
+**`Failed building wheel for PyAudio` / `portaudio.h' file not found`**  
+Install PortAudio, remove the broken venv, and retry:
+
+```bash
+brew install portaudio
+rm -rf whisper-server/.venv
 ./start.sh
 ```
 
@@ -277,7 +289,7 @@ rm -rf whisper-server/.venv
 ```
 
 **`meet-bridge exited during startup` right after pip errors**  
-Fix the pip/FFmpeg problem above first, remove the broken venv (`rm -rf whisper-server/.venv`), then run `./start.sh` again.
+Fix the pip/Homebrew problem above first, remove the broken venv (`rm -rf whisper-server/.venv`), then run `./start.sh` again.
 
 ---
 
