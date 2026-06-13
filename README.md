@@ -4,6 +4,8 @@ Bridge between your online meeting and Cursor AI: real-time transcript + ask the
 
 **What it does:** Captures audio from your Chrome meeting tab, transcribes it locally with Whisper, and lets you ask Cursor's AI agent questions about your code with full meeting context.
 
+![MeetBridge: live meeting transcript and ask the agent from the extension popup](image.png)
+
 ---
 
 ## How it works
